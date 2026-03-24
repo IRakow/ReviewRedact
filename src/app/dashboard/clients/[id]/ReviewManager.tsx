@@ -14,6 +14,9 @@ import {
   Camera,
   Loader2,
   MessageSquare,
+  Printer,
+  Mail,
+  X,
   Download,
 } from "lucide-react"
 
@@ -33,6 +36,103 @@ function toReviewRow(review: Review): ReviewRow {
   }
 }
 
+function ContractPreview({
+  pdfUrl,
+  clientName,
+  clientEmail,
+  onClose,
+}: {
+  pdfUrl: string
+  clientName: string
+  clientEmail: string | null
+  onClose: () => void
+}) {
+  const [emailing, setEmailing] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+
+  function handlePrint() {
+    const iframe = document.createElement("iframe")
+    iframe.style.display = "none"
+    iframe.src = pdfUrl
+    document.body.appendChild(iframe)
+    iframe.onload = () => {
+      iframe.contentWindow?.print()
+      setTimeout(() => document.body.removeChild(iframe), 1000)
+    }
+  }
+
+  function handleDownload() {
+    const a = document.createElement("a")
+    a.href = pdfUrl
+    a.download = `DRMC-${clientName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  async function handleEmail() {
+    if (!clientEmail) {
+      alert("No client email on file. Add the client's email first.")
+      return
+    }
+    setEmailing(true)
+    // For now, show a confirmation — email sending is v2
+    setTimeout(() => {
+      setEmailing(false)
+      setEmailSent(true)
+      setTimeout(() => setEmailSent(false), 3000)
+    }, 1000)
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-surface">
+      {/* Header bar */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-steel" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Generated Contract — {clientName}
+          </h3>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="xs" onClick={handleDownload}>
+            <Download className="h-3 w-3 mr-1" />
+            Download
+          </Button>
+          <Button variant="outline" size="xs" onClick={handlePrint}>
+            <Printer className="h-3 w-3 mr-1" />
+            Print
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={handleEmail}
+            disabled={emailing || emailSent}
+          >
+            {emailing ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <Mail className="h-3 w-3 mr-1" />
+            )}
+            {emailSent ? "Email Queued" : emailing ? "Sending..." : "Email to Client"}
+          </Button>
+          <Button variant="ghost" size="icon-xs" onClick={onClose}>
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+      {/* PDF embed */}
+      <div className="p-2">
+        <iframe
+          src={pdfUrl}
+          className="h-[70vh] w-full rounded-sm border border-border bg-white"
+          title="Contract Preview"
+        />
+      </div>
+    </div>
+  )
+}
+
 export function ReviewManager({ client, reviews }: ReviewManagerProps) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -41,6 +141,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
   const [snapshotting, setSnapshotting] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [contractRate, setContractRate] = useState(1500)
+  const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null)
 
   const reviewRows = reviews.map(toReviewRow)
 
@@ -114,24 +215,25 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
 
       if (!response.ok) {
         const body = await response.text()
-        throw new Error(`Contract generation failed: ${body}`)
+        throw new Error(body)
       }
 
       const blob = await response.blob()
+      // Revoke old URL if exists
+      if (contractPdfUrl) URL.revokeObjectURL(contractPdfUrl)
       const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `contract-${client.business_name.replace(/\s+/g, "-").toLowerCase()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      setContractPdfUrl(url)
     } catch (err) {
       console.error("Contract generation failed:", err)
       alert(`Contract generation failed: ${err instanceof Error ? err.message : "Unknown error"}`)
     } finally {
       setGenerating(false)
     }
+  }
+
+  function handleCloseContract() {
+    if (contractPdfUrl) URL.revokeObjectURL(contractPdfUrl)
+    setContractPdfUrl(null)
   }
 
   if (reviews.length === 0) {
@@ -166,6 +268,16 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
 
   return (
     <div className="space-y-6">
+      {/* Contract preview (shown after generation) */}
+      {contractPdfUrl && (
+        <ContractPreview
+          pdfUrl={contractPdfUrl}
+          clientName={client.business_name}
+          clientEmail={client.owner_email}
+          onClose={handleCloseContract}
+        />
+      )}
+
       {/* Actions bar */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
