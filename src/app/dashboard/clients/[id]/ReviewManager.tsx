@@ -40,6 +40,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
   const [scraping, setScraping] = useState(false)
   const [snapshotting, setSnapshotting] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [contractRate, setContractRate] = useState(1500)
 
   const reviewRows = reviews.map(toReviewRow)
 
@@ -107,6 +108,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
         body: JSON.stringify({
           client_id: client.id,
           selected_review_ids: Array.from(selectedIds),
+          contract_rate_google: contractRate,
         }),
       })
 
@@ -126,6 +128,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error("Contract generation failed:", err)
+      alert(`Contract generation failed: ${err instanceof Error ? err.message : "Unknown error"}`)
     } finally {
       setGenerating(false)
     }
@@ -194,6 +197,24 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
         </Button>
 
         <div className="flex-1" />
+
+        {/* Contract rate input */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Rate/Review
+          </label>
+          <div className="relative">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+            <input
+              type="number"
+              value={contractRate}
+              onChange={(e) => setContractRate(Number(e.target.value))}
+              className="w-24 rounded-sm border border-border bg-surface py-1.5 pl-5 pr-2 text-right font-mono text-xs text-foreground focus:border-steel focus:outline-none"
+              min={1000}
+              step={100}
+            />
+          </div>
+        </div>
 
         <Button
           size="sm"
