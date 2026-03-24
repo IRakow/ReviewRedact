@@ -10,26 +10,27 @@ interface VaultDoorProps {
   isOpen: boolean
 }
 
-function VaultRim() {
+// The vault frame — circular opening in the wall
+function VaultFrame() {
   return (
-    <group position={[0, 1.2, -2.82]}>
-      {/* Outer rim */}
-      <mesh castShadow>
-        <torusGeometry args={[1.35, 0.1, 16, 64]} />
-        <meshStandardMaterial color="#555" roughness={0.15} metalness={0.95} />
+    <group position={[0, 1.2, -2.84]}>
+      {/* Thick outer rim ring */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.4, 0.15, 16, 64]} />
+        <meshStandardMaterial color="#4a4a4a" roughness={0.15} metalness={0.95} />
       </mesh>
       {/* Inner rim */}
-      <mesh>
-        <torusGeometry args={[1.22, 0.06, 12, 64]} />
-        <meshStandardMaterial color="#444" roughness={0.2} metalness={0.9} />
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.25, 0.08, 12, 64]} />
+        <meshStandardMaterial color="#3a3a3a" roughness={0.2} metalness={0.9} />
       </mesh>
-      {/* Decorative ring — glowing steel blue */}
-      <mesh>
-        <torusGeometry args={[1.28, 0.008, 8, 64]} />
+      {/* Glowing accent ring */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.32, 0.006, 8, 64]} />
         <meshStandardMaterial
           color="#4a7c9b"
           emissive="#4a7c9b"
-          emissiveIntensity={2}
+          emissiveIntensity={3}
           toneMapped={false}
         />
       </mesh>
@@ -37,37 +38,39 @@ function VaultRim() {
   )
 }
 
+// Locking bolts around the door
 function VaultBolt({ angle, isOpen }: { angle: number; isOpen: boolean }) {
   const ref = useRef<THREE.Group>(null!)
-  const targetExtend = isOpen ? -0.2 : 0.15
 
   useFrame(() => {
     if (!ref.current) return
-    ref.current.position.z = THREE.MathUtils.lerp(ref.current.position.z, targetExtend, 0.04)
+    // Bolts retract inward when open
+    const target = isOpen ? 1.0 : 1.3
+    const currentR = ref.current.userData.r || 1.3
+    const newR = THREE.MathUtils.lerp(currentR, target, 0.04)
+    ref.current.userData.r = newR
+
+    ref.current.position.x = Math.cos(angle) * newR
+    ref.current.position.y = Math.sin(angle) * newR + 1.2
   })
 
-  const x = Math.cos(angle) * 1.12
-  const y = Math.sin(angle) * 1.12 + 1.2
+  const x = Math.cos(angle) * 1.3
+  const y = Math.sin(angle) * 1.3 + 1.2
 
   return (
-    <group ref={ref} position={[x, y, -2.7]}>
-      {/* Bolt shaft */}
-      <mesh castShadow>
-        <cylinderGeometry args={[0.035, 0.04, 0.25, 8]} />
-        <meshStandardMaterial color="#4a4a4a" roughness={0.25} metalness={0.95} />
-      </mesh>
-      {/* Bolt head */}
-      <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, 0.02, 6]} />
+    <group ref={ref} position={[x, y, -2.78]}>
+      {/* Bolt cylinder — horizontal, pointing outward from center */}
+      <mesh rotation={[0, 0, angle]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.2, 8]} />
         <meshStandardMaterial color="#555" roughness={0.2} metalness={0.95} />
       </mesh>
-      {/* Indicator light on each bolt */}
-      <mesh position={[0, 0.14, 0.02]}>
-        <sphereGeometry args={[0.01, 6, 6]} />
+      {/* Indicator light */}
+      <mesh position={[0, 0, 0.05]}>
+        <sphereGeometry args={[0.012, 6, 6]} />
         <meshStandardMaterial
           color={isOpen ? "#22c55e" : "#d4a853"}
           emissive={isOpen ? "#22c55e" : "#d4a853"}
-          emissiveIntensity={4}
+          emissiveIntensity={5}
           toneMapped={false}
         />
       </mesh>
@@ -75,167 +78,154 @@ function VaultBolt({ angle, isOpen }: { angle: number; isOpen: boolean }) {
   )
 }
 
-function VaultHandle({ isOpen }: { isOpen: boolean }) {
+// The combination wheel/handle
+function VaultWheel({ isOpen }: { isOpen: boolean }) {
   const ref = useRef<THREE.Group>(null!)
   const glowRef = useRef<THREE.Mesh>(null!)
 
   useFrame(({ clock }) => {
     if (!ref.current) return
-    const targetRot = isOpen ? Math.PI * 3 : 0
-    ref.current.rotation.z = THREE.MathUtils.lerp(ref.current.rotation.z, targetRot, 0.025)
+    const targetRot = isOpen ? Math.PI * 4 : 0
+    ref.current.rotation.z = THREE.MathUtils.lerp(ref.current.rotation.z, targetRot, 0.02)
 
-    // Pulse the center glow
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshStandardMaterial
       const t = clock.getElapsedTime()
-      mat.emissiveIntensity = 2 + Math.sin(t * 1.5) * 1
+      mat.emissiveIntensity = 2.5 + Math.sin(t * 1.5) * 1
     }
   })
 
   return (
-    <group ref={ref} position={[0, 1.2, -2.62]}>
-      {/* Central hub — glowing */}
-      <mesh ref={glowRef} castShadow>
-        <cylinderGeometry args={[0.14, 0.14, 0.06, 24]} />
+    <group ref={ref} position={[0, 1.2, -2.68]}>
+      {/* Center hub — glowing */}
+      <mesh ref={glowRef}>
+        <cylinderGeometry args={[0.12, 0.12, 0.05, 32]} />
         <meshStandardMaterial
           color="#4a7c9b"
-          roughness={0.15}
+          roughness={0.1}
           metalness={0.95}
           emissive="#4a7c9b"
-          emissiveIntensity={2}
+          emissiveIntensity={2.5}
           toneMapped={false}
         />
       </mesh>
-      {/* Hub ring */}
-      <mesh>
-        <torusGeometry args={[0.14, 0.015, 8, 24]} />
-        <meshStandardMaterial color="#555" roughness={0.2} metalness={0.95} />
+      {/* Hub rim */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.12, 0.012, 8, 32]} />
+        <meshStandardMaterial color="#555" roughness={0.15} metalness={0.95} />
       </mesh>
-      {/* 5 Spokes */}
-      {[0, (Math.PI * 2) / 5, (Math.PI * 4) / 5, (Math.PI * 6) / 5, (Math.PI * 8) / 5].map(
-        (angle, i) => (
-          <group key={i} rotation={[0, 0, angle]}>
-            {/* Spoke bar */}
-            <mesh position={[0.32, 0, 0]} castShadow>
-              <boxGeometry args={[0.4, 0.035, 0.035]} />
-              <meshStandardMaterial color="#4a4a4a" roughness={0.25} metalness={0.95} />
+      {/* 5 spokes */}
+      {[0, 1, 2, 3, 4].map((i) => {
+        const a = (i * Math.PI * 2) / 5
+        return (
+          <group key={i} rotation={[0, 0, a]}>
+            <mesh position={[0.3, 0, 0]}>
+              <boxGeometry args={[0.36, 0.03, 0.03]} />
+              <meshStandardMaterial color="#4a4a4a" roughness={0.2} metalness={0.95} />
             </mesh>
-            {/* Spoke end cap */}
-            <mesh position={[0.52, 0, 0]}>
-              <sphereGeometry args={[0.03, 8, 8]} />
-              <meshStandardMaterial color="#555" roughness={0.2} metalness={0.9} />
+            <mesh position={[0.48, 0, 0]}>
+              <sphereGeometry args={[0.025, 8, 8]} />
+              <meshStandardMaterial color="#555" roughness={0.15} metalness={0.9} />
             </mesh>
           </group>
         )
-      )}
+      })}
       {/* Outer ring */}
-      <mesh>
-        <torusGeometry args={[0.52, 0.025, 12, 48]} />
-        <meshStandardMaterial color="#4a4a4a" roughness={0.2} metalness={0.95} />
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.5, 0.02, 12, 48]} />
+        <meshStandardMaterial color="#4a4a4a" roughness={0.15} metalness={0.95} />
       </mesh>
     </group>
   )
 }
 
 export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
-  const doorRef = useRef<THREE.Group>(null!)
+  const doorPivot = useRef<THREE.Group>(null!)
   const [hovered, setHovered] = useState(false)
 
   useFrame(() => {
-    if (!doorRef.current) return
-    const targetRotation = isOpen ? -Math.PI / 2.2 : 0
-    doorRef.current.rotation.y = THREE.MathUtils.lerp(
-      doorRef.current.rotation.y,
-      targetRotation,
-      0.015
+    if (!doorPivot.current) return
+    // Door swings open on Y axis from left edge
+    const targetY = isOpen ? -Math.PI / 2.5 : 0
+    doorPivot.current.rotation.y = THREE.MathUtils.lerp(
+      doorPivot.current.rotation.y,
+      targetY,
+      0.012
     )
   })
 
   return (
     <group>
-      {/* Vault rim (stays in place) */}
-      <VaultRim />
+      {/* Fixed frame in the wall */}
+      <VaultFrame />
 
-      {/* Bolts around the rim */}
-      {Array.from({ length: 10 }).map((_, i) => (
-        <VaultBolt key={i} angle={(i * Math.PI * 2) / 10} isOpen={isOpen} />
+      {/* Locking bolts (fixed to frame, retract when opening) */}
+      {Array.from({ length: 12 }).map((_, i) => (
+        <VaultBolt key={i} angle={(i * Math.PI * 2) / 12} isOpen={isOpen} />
       ))}
 
-      {/* Door group (pivots open from left edge) */}
-      <group ref={doorRef} position={[-1.2, 0, -2.85]}>
-        {/* Door disc */}
+      {/* Door pivot group — hinge on left edge */}
+      <group ref={doorPivot} position={[-1.2, 0, -2.85]}>
+        {/* The actual door — a thick disc facing the camera */}
         <mesh
           position={[1.2, 1.2, 0]}
+          rotation={[Math.PI / 2, 0, 0]}
           onClick={(e) => {
             e.stopPropagation()
             if (!isOpen) onOpen()
           }}
-          onPointerOver={() => { setHovered(true); document.body.style.cursor = "pointer" }}
-          onPointerOut={() => { setHovered(false); document.body.style.cursor = "default" }}
+          onPointerOver={() => {
+            setHovered(true)
+            document.body.style.cursor = "pointer"
+          }}
+          onPointerOut={() => {
+            setHovered(false)
+            document.body.style.cursor = "default"
+          }}
           castShadow
           receiveShadow
         >
-          <cylinderGeometry args={[1.2, 1.2, 0.18, 64]} />
+          <cylinderGeometry args={[1.2, 1.2, 0.2, 64]} />
           <meshStandardMaterial
-            color={hovered && !isOpen ? "#4a5a6a" : "#3a3a3a"}
+            color={hovered && !isOpen ? "#4a5060" : "#383838"}
             roughness={0.25}
             metalness={0.9}
           />
         </mesh>
 
-        {/* Concentric decorative rings on door face */}
-        {[0.4, 0.7, 1.0].map((r, i) => (
-          <mesh key={i} position={[1.2, 1.2, 0.095]}>
-            <torusGeometry args={[r, 0.005, 8, 64]} />
-            <meshStandardMaterial
-              color="#555"
-              roughness={0.2}
-              metalness={0.95}
-            />
+        {/* Concentric rings on door face */}
+        {[0.3, 0.6, 0.9, 1.1].map((r, i) => (
+          <mesh key={i} position={[1.2, 1.2, 0.11]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[r, 0.004, 8, 64]} />
+            <meshStandardMaterial color="#505050" roughness={0.2} metalness={0.9} />
           </mesh>
         ))}
 
-        {/* Handle (on the door) */}
-        <group position={[1.2, 0, 0.1]}>
-          <VaultHandle isOpen={isOpen} />
-        </group>
+        {/* Rivets — outer ring */}
+        {Array.from({ length: 20 }).map((_, i) => {
+          const a = (i * Math.PI * 2) / 20
+          return (
+            <mesh
+              key={i}
+              position={[1.2 + Math.cos(a) * 1.08, 1.2 + Math.sin(a) * 1.08, 0.11]}
+            >
+              <sphereGeometry args={[0.018, 6, 6]} />
+              <meshStandardMaterial color="#505050" roughness={0.3} metalness={0.9} />
+            </mesh>
+          )
+        })}
 
-        {/* Rivets on door face — two rings */}
-        {Array.from({ length: 16 }).map((_, i) => {
-          const angle = (i * Math.PI * 2) / 16
-          const r = 1.05
-          return (
-            <mesh
-              key={`outer-${i}`}
-              position={[1.2 + Math.cos(angle) * r, 1.2 + Math.sin(angle) * r, 0.09]}
-              castShadow
-            >
-              <sphereGeometry args={[0.02, 6, 6]} />
-              <meshStandardMaterial color="#555" roughness={0.3} metalness={0.9} />
-            </mesh>
-          )
-        })}
-        {Array.from({ length: 8 }).map((_, i) => {
-          const angle = (i * Math.PI * 2) / 8 + Math.PI / 8
-          const r = 0.85
-          return (
-            <mesh
-              key={`inner-${i}`}
-              position={[1.2 + Math.cos(angle) * r, 1.2 + Math.sin(angle) * r, 0.09]}
-              castShadow
-            >
-              <sphereGeometry args={[0.015, 6, 6]} />
-              <meshStandardMaterial color="#4a4a4a" roughness={0.3} metalness={0.9} />
-            </mesh>
-          )
-        })}
+        {/* Wheel handle — on the door, moves with it */}
+        <group position={[1.2, 0, 0.12]}>
+          <VaultWheel isOpen={isOpen} />
+        </group>
       </group>
 
-      {/* "REVIEW REDACT" stencil above vault */}
+      {/* Text above vault */}
       <Text
-        position={[0, 3.0, -2.8]}
-        fontSize={0.24}
-        color="#7a7a7a"
+        position={[0, 3.1, -2.82]}
+        fontSize={0.22}
+        color="#6a6a6a"
         anchorX="center"
         anchorY="middle"
         letterSpacing={0.4}
@@ -243,14 +233,14 @@ export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
         REVIEW REDACT
       </Text>
 
-      {/* Tagline below */}
+      {/* Tagline */}
       <Text
-        position={[0, -0.6, -2.8]}
-        fontSize={0.08}
-        color="#4a4a4a"
+        position={[0, -0.7, -2.82]}
+        fontSize={0.075}
+        color="#3a3a3a"
         anchorX="center"
         anchorY="middle"
-        letterSpacing={0.4}
+        letterSpacing={0.35}
       >
         ...For those in the know...
       </Text>
