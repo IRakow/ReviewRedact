@@ -38,17 +38,20 @@ function toReviewRow(review: Review): ReviewRow {
 
 function ContractPreview({
   pdfUrl,
+  clientId,
   clientName,
   clientEmail,
   onClose,
 }: {
   pdfUrl: string
+  clientId: string
   clientName: string
   clientEmail: string | null
   onClose: () => void
 }) {
   const [emailing, setEmailing] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   function handlePrint() {
     const iframe = document.createElement("iframe")
@@ -76,12 +79,37 @@ function ContractPreview({
       return
     }
     setEmailing(true)
-    // For now, show a confirmation — email sending is v2
-    setTimeout(() => {
-      setEmailing(false)
+    setEmailError(null)
+    try {
+      // Fetch the PDF blob and convert to base64
+      const response = await fetch(pdfUrl)
+      const blob = await response.blob()
+      const buffer = await blob.arrayBuffer()
+      const base64 = btoa(
+        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+      )
+
+      const res = await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          pdf_base64: base64,
+          filename: `DRMC-${clientName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Failed to send email")
+      }
+
       setEmailSent(true)
-      setTimeout(() => setEmailSent(false), 3000)
-    }, 1000)
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Failed to send")
+    } finally {
+      setEmailing(false)
+    }
   }
 
   return (
@@ -114,8 +142,11 @@ function ContractPreview({
             ) : (
               <Mail className="h-3 w-3 mr-1" />
             )}
-            {emailSent ? "Email Queued" : emailing ? "Sending..." : "Email to Client"}
+            {emailSent ? "Sent!" : emailing ? "Sending..." : "Email to Client"}
           </Button>
+          {emailError && (
+            <span className="text-[10px] text-red-400">{emailError}</span>
+          )}
           <Button variant="ghost" size="icon-xs" onClick={onClose}>
             <X className="h-3.5 w-3.5" />
           </Button>
@@ -272,6 +303,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
       {contractPdfUrl && (
         <ContractPreview
           pdfUrl={contractPdfUrl}
+          clientId={client.id}
           clientName={client.business_name}
           clientEmail={client.owner_email}
           onClose={handleCloseContract}
