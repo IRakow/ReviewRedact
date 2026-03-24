@@ -196,7 +196,6 @@ export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
         anchorX="center"
         anchorY="middle"
         letterSpacing={0.35}
-        font="/fonts/geist-mono.woff"
       >
         REVIEW REDACT
       </Text>

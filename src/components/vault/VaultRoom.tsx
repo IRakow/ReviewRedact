@@ -1,11 +1,31 @@
 "use client"
 
-import { Suspense, useState, useCallback } from "react"
+import { Suspense, useState, useCallback, useEffect, Component, type ReactNode } from "react"
 import { Canvas } from "@react-three/fiber"
 import { PerspectiveCamera } from "@react-three/drei"
 import { BunkerEnvironment } from "./BunkerEnvironment"
 import { VaultDoor } from "./VaultDoor"
 import { LoginPanel } from "./LoginPanel"
+
+class ErrorBoundary extends Component<
+  { children: ReactNode; onError: (error: Error) => void },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; onError: (error: Error) => void }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: Error) {
+    this.props.onError(error)
+  }
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
+}
 
 function LoadingScreen() {
   return (
@@ -27,50 +47,76 @@ function LoadingScreen() {
 export function VaultRoom() {
   const [isOpen, setIsOpen] = useState(false)
   const [showLogin, setShowLogin] = useState(false)
+  const [canvasReady, setCanvasReady] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const handleOpen = useCallback(() => {
     setIsOpen(true)
-    // Show login panel after door animation starts
     setTimeout(() => setShowLogin(true), 1500)
   }, [])
 
+  // Timeout — if canvas doesn't load in 8s, show login directly
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!canvasReady) {
+        setLoadError("3D scene timed out")
+        setShowLogin(true)
+      }
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [canvasReady])
+
   return (
     <div className="relative h-screen w-screen bg-background overflow-hidden">
-      <Suspense fallback={<LoadingScreen />}>
+      {!canvasReady && !loadError && <LoadingScreen />}
+
+      <ErrorBoundary onError={(err) => {
+        setLoadError(err.message)
+        setShowLogin(true)
+      }}>
         <Canvas
           shadows
-          dpr={[1, 2]}
+          dpr={[1, 1.5]}
           gl={{
             antialias: true,
-            toneMapping: 3, // ACESFilmic
-            toneMappingExposure: 0.8,
+            powerPreference: "default",
           }}
           style={{ cursor: isOpen ? "default" : "pointer" }}
+          onCreated={() => setCanvasReady(true)}
         >
-          <PerspectiveCamera
-            makeDefault
-            position={[0, 1.5, 3.5]}
-            fov={50}
-            near={0.1}
-            far={50}
-          />
+          <Suspense fallback={null}>
+            <PerspectiveCamera
+              makeDefault
+              position={[0, 1.5, 3.5]}
+              fov={50}
+              near={0.1}
+              far={50}
+            />
 
-          <fog attach="fog" args={["#0a0a0a", 3, 12]} />
+            <fog attach="fog" args={["#0a0a0a", 3, 12]} />
 
-          <BunkerEnvironment />
-          <VaultDoor onOpen={handleOpen} isOpen={isOpen} />
+            <BunkerEnvironment />
+            <VaultDoor onOpen={handleOpen} isOpen={isOpen} />
+          </Suspense>
         </Canvas>
-      </Suspense>
+      </ErrorBoundary>
 
-      {/* Login panel overlay (HTML, not 3D) */}
+      {/* Login panel overlay */}
       <LoginPanel visible={showLogin} />
 
-      {/* Click hint (before vault is opened) */}
-      {!isOpen && (
+      {/* Click hint */}
+      {canvasReady && !isOpen && (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-pulse">
           <p className="text-[10px] font-medium uppercase tracking-[0.4em] text-muted-foreground/50">
             Click the vault to enter
           </p>
+        </div>
+      )}
+
+      {/* Debug info — remove later */}
+      {loadError && (
+        <div className="absolute top-4 left-4 text-[10px] text-red-500/50 font-mono">
+          {loadError}
         </div>
       )}
     </div>
