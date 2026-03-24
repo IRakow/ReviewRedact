@@ -15,8 +15,8 @@ function VaultRim() {
     <mesh position={[0, 1.2, -2.82]} castShadow>
       <torusGeometry args={[1.3, 0.12, 16, 48]} />
       <meshStandardMaterial
-        color="#2a2a2a"
-        roughness={0.25}
+        color="#4a4a4a"
+        roughness={0.2}
         metalness={0.95}
       />
     </mesh>
@@ -40,7 +40,7 @@ function VaultBolt({ angle, isOpen }: { angle: number; isOpen: boolean }) {
     <mesh ref={ref} position={[x, y, -2.7]} castShadow>
       <cylinderGeometry args={[0.04, 0.04, 0.25, 8]} />
       <meshStandardMaterial
-        color="#3a3a3a"
+        color="#6a6a6a"
         roughness={0.3}
         metalness={0.9}
       />
@@ -86,7 +86,7 @@ function VaultHandle({ isOpen }: { isOpen: boolean }) {
           >
             <boxGeometry args={[0.35, 0.04, 0.04]} />
             <meshStandardMaterial
-              color="#3a3a3a"
+              color="#6a6a6a"
               roughness={0.3}
               metalness={0.9}
             />
@@ -152,9 +152,9 @@ export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
         >
           <cylinderGeometry args={[1.2, 1.2, 0.15, 48]} />
           <meshStandardMaterial
-            color={hovered && !isOpen ? "#2a3a4a" : "#1e1e1e"}
-            roughness={0.35}
-            metalness={0.9}
+            color={hovered && !isOpen ? "#4a5a6a" : "#3a3a3a"}
+            roughness={0.3}
+            metalness={0.85}
           />
         </mesh>
 
@@ -179,7 +179,7 @@ export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
             >
               <sphereGeometry args={[0.025, 6, 6]} />
               <meshStandardMaterial
-                color="#2a2a2a"
+                color="#4a4a4a"
                 roughness={0.4}
                 metalness={0.8}
               />
@@ -192,7 +192,7 @@ export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
       <Text
         position={[0, 3.0, -2.8]}
         fontSize={0.22}
-        color="#3a3a3a"
+        color="#6a6a6a"
         anchorX="center"
         anchorY="middle"
         letterSpacing={0.35}
@@ -204,7 +204,7 @@ export function VaultDoor({ onOpen, isOpen }: VaultDoorProps) {
       <Text
         position={[0, -0.6, -2.8]}
         fontSize={0.07}
-        color="#2a2a2a"
+        color="#4a4a4a"
         anchorX="center"
         anchorY="middle"
         letterSpacing={0.5}

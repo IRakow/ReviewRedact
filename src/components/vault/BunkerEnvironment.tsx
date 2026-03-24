@@ -33,14 +33,14 @@ function SwingingLight() {
         <sphereGeometry args={[0.04, 8, 8]} />
         <meshStandardMaterial color="#d4a853" emissive="#d4a853" emissiveIntensity={3} />
       </mesh>
-      {/* Point light */}
+      {/* Point light — main illumination */}
       <pointLight
         ref={pointLightRef}
         position={[0, -0.1, 0]}
         color="#d4a853"
-        intensity={8}
-        distance={12}
-        decay={2}
+        intensity={50}
+        distance={20}
+        decay={1.5}
         castShadow
         shadow-mapSize-width={512}
         shadow-mapSize-height={512}
@@ -62,9 +62,9 @@ function ConcreteWall({
     <mesh position={position} rotation={rotation} receiveShadow>
       <boxGeometry args={size} />
       <meshStandardMaterial
-        color="#1a1a1a"
-        roughness={0.95}
-        metalness={0.05}
+        color="#222222"
+        roughness={0.92}
+        metalness={0.08}
       />
     </mesh>
   )
@@ -103,8 +103,28 @@ function Pipe({
 export function BunkerEnvironment() {
   return (
     <group>
-      {/* Ambient fill — very dim */}
-      <ambientLight intensity={0.03} color="#1a2a3a" />
+      {/* Ambient fill — enough to see the room */}
+      <ambientLight intensity={0.15} color="#1a2a3a" />
+
+      {/* Secondary fill light from front — so vault door is visible */}
+      <pointLight
+        position={[0, 2, 4]}
+        color="#3a5a7a"
+        intensity={15}
+        distance={15}
+        decay={1.5}
+      />
+
+      {/* Rim light from behind camera — subtle steel blue */}
+      <spotLight
+        position={[2, 3, 5]}
+        color="#4a7c9b"
+        intensity={8}
+        distance={15}
+        angle={0.6}
+        penumbra={0.8}
+        decay={1.5}
+      />
 
       {/* Swinging overhead light */}
       <SwingingLight />

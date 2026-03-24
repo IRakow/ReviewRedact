@@ -93,7 +93,7 @@ export function VaultRoom() {
               far={50}
             />
 
-            <fog attach="fog" args={["#0a0a0a", 3, 12]} />
+            <fog attach="fog" args={["#0a0a0a", 6, 18]} />
 
             <BunkerEnvironment />
             <VaultDoor onOpen={handleOpen} isOpen={isOpen} />
