@@ -101,10 +101,10 @@ export async function triggerScrape(clientId: string) {
 
   const supabase = createServerClient()
 
-  // Verify ownership
+  // Fetch client with google_url
   const { data: client } = await supabase
     .from("clients")
-    .select("reseller_id")
+    .select("reseller_id, google_url")
     .eq("id", clientId)
     .single()
 
@@ -116,17 +116,45 @@ export async function triggerScrape(clientId: string) {
     throw new Error("Unauthorized")
   }
 
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL ? "" : ""}${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/scrape`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: clientId }),
-    }
-  )
+  // Scrape directly (not via API route)
+  const { scrapeGoogleReviews } = await import("@/lib/scraper")
+  const result = await scrapeGoogleReviews(client.google_url)
 
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`Scrape failed: ${body}`)
+  if (result.reviews.length === 0) {
+    throw new Error("No reviews found")
   }
+
+  // Delete existing reviews for fresh scrape
+  await supabase.from("reviews").delete().eq("client_id", clientId)
+
+  // Insert new reviews
+  const reviewRows = result.reviews.map((r) => ({
+    client_id: clientId,
+    platform: "google" as const,
+    reviewer_name: r.reviewer_name,
+    star_rating: r.star_rating,
+    review_text: r.review_text,
+    review_date: r.review_date,
+    status: "active" as const,
+  }))
+
+  const { error: insertError } = await supabase.from("reviews").insert(reviewRows)
+  if (insertError) {
+    throw new Error(`Failed to insert reviews: ${insertError.message}`)
+  }
+
+  // Compute and save snapshot
+  const totalStars = result.reviews.reduce((sum, r) => sum + r.star_rating, 0)
+  const avgRating = totalStars / result.reviews.length
+
+  await supabase.from("snapshots").insert({
+    client_id: clientId,
+    average_rating: Math.round(avgRating * 100) / 100,
+    total_reviews: result.reviews.length,
+    total_stars: totalStars,
+    platform: "google",
+  })
+
+  // Update client status
+  await supabase.from("clients").update({ status: "active" }).eq("id", clientId)
 }
