@@ -175,38 +175,64 @@ export async function compareCommits(base: string, head: string) {
 }
 
 export async function rollbackToCommit(sha: string) {
-  const vercelToken = process.env.VERCEL_TOKEN
-  const vercelProjectId = process.env.VERCEL_PROJECT_ID
-
-  if (!vercelToken || !vercelProjectId) {
-    return { error: "VERCEL_TOKEN or VERCEL_PROJECT_ID not configured. Cannot trigger rollback deployment." }
+  const token = process.env.GITHUB_TOKEN
+  if (!token) {
+    return { error: "GITHUB_TOKEN not configured. Cannot create rollback." }
   }
 
   try {
-    const res = await fetch("https://api.vercel.com/v13/deployments", {
+    // Create a revert branch, then merge it — this is a git-level rollback
+    // Step 1: Get the current main branch HEAD
+    const mainRef = await githubFetch(`/repos/${REPO}/git/ref/heads/main`)
+    if (!mainRef) return { error: "Failed to get main branch ref" }
+
+    const currentHead = (mainRef as Record<string, unknown>).object as Record<string, unknown>
+
+    // Step 2: Create a merge commit that reverts to the target SHA's tree
+    const targetCommit = await githubFetch(`/repos/${REPO}/git/commits/${sha}`)
+    if (!targetCommit) return { error: "Failed to get target commit" }
+
+    const targetTree = (targetCommit as Record<string, unknown>).tree as Record<string, unknown>
+
+    // Step 3: Create a new commit with the old tree on top of current HEAD
+    const res = await fetch(`${GITHUB_API}/repos/${REPO}/git/commits`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${vercelToken}`,
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: "reviewredact",
-        project: vercelProjectId,
-        gitSource: {
-          type: "github",
-          repo: REPO,
-          ref: sha,
-        },
+        message: `revert: rollback to ${sha.slice(0, 8)} via Time Machine`,
+        tree: targetTree.sha,
+        parents: [currentHead.sha],
       }),
     })
 
     if (!res.ok) {
       const body = await res.text()
-      return { error: `Vercel deployment failed: ${res.status} — ${body}` }
+      return { error: `Failed to create revert commit: ${res.status} — ${body}` }
     }
 
-    const deployment = (await res.json()) as Record<string, unknown>
-    return { success: true, deploymentUrl: deployment.url as string }
+    const newCommit = (await res.json()) as Record<string, unknown>
+
+    // Step 4: Update main branch to point to the new commit
+    const updateRes = await fetch(`${GITHUB_API}/repos/${REPO}/git/refs/heads/main`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sha: newCommit.sha }),
+    })
+
+    if (!updateRes.ok) {
+      const body = await updateRes.text()
+      return { error: `Failed to update main branch: ${updateRes.status} — ${body}` }
+    }
+
+    return { success: true, commitSha: newCommit.sha as string }
   } catch (err) {
     return { error: `Rollback failed: ${String(err)}` }
   }
