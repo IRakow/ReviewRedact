@@ -4,8 +4,11 @@ import { getSession, createSession, setSessionCookie } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import { Resend } from "resend"
 import { PIN_CODE_LENGTH } from "@/lib/constants"
 import { RESELLER_SALESPERSON_MIN_RATE } from "@/lib/constants"
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 function generatePinCode(): string {
   const max = Math.pow(10, PIN_CODE_LENGTH)
@@ -233,4 +236,48 @@ export async function setDealOverride(salespersonId: string, clientId: string, r
 
   revalidatePath("/dashboard/settings")
   return { success: true }
+}
+
+export async function resetSalespersonPinByReseller(spId: string) {
+  const session = await getSession()
+  if (!session || session.user_type !== "reseller") {
+    return { error: "Unauthorized" }
+  }
+
+  const supabase = createServerClient()
+
+  // Verify SP belongs to this reseller
+  const { data: sp } = await supabase
+    .from("salespeople")
+    .select("id, name, email, reseller_id")
+    .eq("id", spId)
+    .single()
+
+  if (!sp || sp.reseller_id !== session.user_id) {
+    return { error: "Not found" }
+  }
+
+  const newPin = await generateUniquePinCode()
+
+  const { error } = await supabase
+    .from("salespeople")
+    .update({ pin_code: newPin, updated_at: new Date().toISOString() })
+    .eq("id", spId)
+
+  if (error) return { error: error.message }
+
+  // Email the salesperson
+  try {
+    await resend.emails.send({
+      from: "Review Redact <notifications@reviewredact.com>",
+      to: sp.email,
+      subject: "ReviewRedact \u2014 Your New Access Code",
+      html: `<p>Hi ${sp.name},</p><p>Your access code has been reset by your reseller.</p><p style="font-size: 24px; font-weight: bold; letter-spacing: 0.5em; font-family: monospace;">${newPin}</p><p>Please log in at reviewredact.com and keep this code secure.</p>`,
+    })
+  } catch (err) {
+    console.error("Failed to send PIN reset email:", err)
+  }
+
+  revalidatePath("/dashboard/settings")
+  return { success: true, pin_code: newPin }
 }

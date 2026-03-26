@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Save } from "lucide-react"
-import { updateSalesperson } from "./actions"
+import { Save, KeyRound } from "lucide-react"
+import { updateSalesperson, resetSalespersonPin } from "./actions"
 
 const COMMISSION_LABELS: Record<string, string> = {
   fixed: "Fixed",
@@ -41,6 +41,8 @@ export function SalespersonEditForm({
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [isPending, startTransition] = useTransition()
+  const [resetResult, setResetResult] = useState("")
+  const [resetting, setResetting] = useState(false)
 
   const inputCls =
     "w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
@@ -226,14 +228,43 @@ export function SalespersonEditForm({
           <p className="text-xs font-medium uppercase tracking-wider text-emerald-400">{success}</p>
         )}
 
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-sm border border-steel/30 bg-steel/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-steel transition-all hover:bg-steel/20 hover:border-steel/50 disabled:opacity-30"
-        >
-          <Save className="h-3.5 w-3.5" />
-          {isPending ? "Saving..." : "Save Changes"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-sm border border-steel/30 bg-steel/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-steel transition-all hover:bg-steel/20 hover:border-steel/50 disabled:opacity-30"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {isPending ? "Saving..." : "Save Changes"}
+          </button>
+
+          <button
+            type="button"
+            disabled={resetting}
+            onClick={async () => {
+              if (!confirm("Reset this salesperson's access code? A new code will be emailed to them.")) return
+              setResetting(true)
+              setResetResult("")
+              const result = await resetSalespersonPin(id)
+              if (result.error) {
+                setResetResult(`Error: ${result.error}`)
+              } else {
+                setResetResult(`New code: ${result.pin_code}`)
+              }
+              setResetting(false)
+            }}
+            className="inline-flex items-center gap-2 rounded-sm border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-amber-400 transition-all hover:bg-amber-500/20 hover:border-amber-500/50 disabled:opacity-30"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            {resetting ? "Resetting..." : "Reset PIN"}
+          </button>
+        </div>
+
+        {resetResult && (
+          <p className={`text-xs font-medium uppercase tracking-wider font-mono ${resetResult.startsWith("Error") ? "text-red-400" : "text-amber-400"}`}>
+            {resetResult}
+          </p>
+        )}
       </div>
     </form>
   )

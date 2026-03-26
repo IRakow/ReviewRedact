@@ -3,7 +3,79 @@
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { Resend } from "resend"
+import { PIN_CODE_LENGTH } from "@/lib/constants"
 import type { CommissionPlanType } from "@/lib/types"
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+function generatePinCode(): string {
+  const max = Math.pow(10, PIN_CODE_LENGTH)
+  const pin = Math.floor(Math.random() * max)
+  return pin.toString().padStart(PIN_CODE_LENGTH, "0")
+}
+
+async function generateUniquePinCode(): Promise<string> {
+  const supabase = createServerClient()
+  let attempts = 0
+
+  while (attempts < 20) {
+    const pin = generatePinCode()
+    const [{ data: r }, { data: s }] = await Promise.all([
+      supabase.from("resellers").select("id").eq("pin_code", pin).maybeSingle(),
+      supabase.from("salespeople").select("id").eq("pin_code", pin).maybeSingle(),
+    ])
+    if (!r && !s) return pin
+    attempts++
+  }
+  throw new Error("Failed to generate unique PIN")
+}
+
+export async function resetResellerPin(id: string) {
+  const session = await getSession()
+  if (!session || session.user_type !== "owner") {
+    return { error: "Unauthorized" }
+  }
+
+  const supabase = createServerClient()
+
+  const { data: resellerData } = await supabase
+    .from("resellers")
+    .select("id, name, email, role")
+    .eq("id", id)
+    .eq("role", "reseller")
+    .single()
+
+  if (!resellerData) {
+    return { error: "Reseller not found" }
+  }
+
+  const newPin = await generateUniquePinCode()
+
+  const { error } = await supabase
+    .from("resellers")
+    .update({ pin_code: newPin, updated_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  // Email the reseller
+  try {
+    await resend.emails.send({
+      from: "Review Redact <notifications@reviewredact.com>",
+      to: resellerData.email,
+      subject: "ReviewRedact \u2014 Your New Access Code",
+      html: `<p>Hi ${resellerData.name},</p><p>Your access code has been reset by an administrator.</p><p style="font-size: 24px; font-weight: bold; letter-spacing: 0.5em; font-family: monospace;">${newPin}</p><p>Please log in at reviewredact.com and keep this code secure.</p>`,
+    })
+  } catch (err) {
+    console.error("Failed to send PIN reset email:", err)
+  }
+
+  revalidatePath(`/owner/resellers/${id}`)
+  return { success: true, pin_code: newPin }
+}
 
 export async function updateReseller(id: string, formData: FormData) {
   const session = await getSession()

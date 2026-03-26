@@ -18,6 +18,10 @@ export function LoginPanel({
   const [loading, setLoading] = useState(false)
   const [shake, setShake] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
+  const [showReset, setShowReset] = useState(false)
+  const [resetName, setResetName] = useState("")
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetMessage, setResetMessage] = useState("")
 
   useEffect(() => {
     if (visible && nameRef.current) {
@@ -58,6 +62,25 @@ export function LoginPanel({
     } catch {
       setError("Connection failed")
       setLoading(false)
+    }
+  }
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setResetLoading(true)
+    setResetMessage("")
+
+    try {
+      await fetch("/api/auth/reset-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: resetName.trim() }),
+      })
+      setResetMessage("If an account exists with that name, a new code has been emailed.")
+    } catch {
+      setResetMessage("If an account exists with that name, a new code has been emailed.")
+    } finally {
+      setResetLoading(false)
     }
   }
 
@@ -162,7 +185,77 @@ export function LoginPanel({
                   "Enter"
                 )}
               </button>
+
+              {/* Forgot PIN link */}
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => { setShowReset(!showReset); setResetMessage(""); setResetName("") }}
+                  className="text-[10px] text-muted-foreground hover:text-steel transition-colors tracking-wide"
+                >
+                  Forgot your access code?
+                </button>
+              </div>
             </form>
+
+            {/* Reset PIN form */}
+            <AnimatePresence>
+              {showReset && (
+                <motion.form
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  onSubmit={handleResetSubmit}
+                  className="w-80 space-y-3 rounded-md border border-steel/20 bg-[#0a0a0a]/90 p-5 backdrop-blur-xl overflow-hidden"
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground text-center">
+                    Request Code Reset
+                  </p>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      value={resetName}
+                      onChange={(e) => setResetName(e.target.value)}
+                      className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30 transition-colors"
+                      placeholder="Enter your name"
+                      required
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  <AnimatePresence>
+                    {resetMessage && (
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="text-center text-[10px] font-medium tracking-wide text-emerald-400"
+                      >
+                        {resetMessage}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading || resetName.trim().length === 0}
+                    className="w-full rounded-sm border border-steel/30 bg-steel/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-steel transition-all hover:bg-steel/20 hover:border-steel/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    {resetLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-steel/30 border-t-steel" />
+                        Sending
+                      </span>
+                    ) : (
+                      "Request Reset"
+                    )}
+                  </button>
+                </motion.form>
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       )}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Users, DollarSign, ArrowLeft, Plus, UserCheck, UserX, Settings2 } from "lucide-react"
 import { CommissionPlanForm } from "./CommissionPlanForm"
 import { updateGlobalCommissionPlan } from "./actions"
+import { ResetSpPinButton } from "./ResetSpPinButton"
 import type { CommissionPlanType, CommissionPlanConfig } from "@/lib/types"
 
 const PLAN_LABELS: Record<string, string> = {
@@ -155,12 +156,15 @@ export default async function ResellerSettingsPage() {
                     <StatusBadge status={sp.is_active ? "active" : "paused"} />
                   </td>
                   <td className="px-5 py-3">
-                    <Link
-                      href={`/dashboard/settings/salespeople/${sp.id}`}
-                      className="text-xs text-steel hover:text-steel-light transition-colors"
-                    >
-                      Edit
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <ResetSpPinButton spId={sp.id} spName={sp.name} />
+                      <Link
+                        href={`/dashboard/settings/salespeople/${sp.id}`}
+                        className="text-xs text-steel hover:text-steel-light transition-colors"
+                      >
+                        Edit
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
