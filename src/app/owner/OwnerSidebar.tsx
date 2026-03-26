@@ -36,7 +36,7 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" })
-    router.push("/")
+    window.location.href = "/"
   }
 
   return (

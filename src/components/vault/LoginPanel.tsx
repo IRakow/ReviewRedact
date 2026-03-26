@@ -47,13 +47,13 @@ export function LoginPanel({
         return
       }
 
-      // Route based on role and document signing status
+      // Hard navigation (not router.push) to avoid client-side cache issues
       if (!data.documents_signed && data.user_type !== "owner") {
-        router.push("/sign")
+        window.location.href = "/sign"
       } else if (data.user_type === "owner") {
-        router.push("/owner")
+        window.location.href = "/owner"
       } else {
-        router.push("/dashboard")
+        window.location.href = "/dashboard"
       }
     } catch {
       setError("Connection failed")
