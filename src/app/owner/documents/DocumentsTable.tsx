@@ -158,6 +158,41 @@ export function DocumentsTable({
                 </div>
               </div>
 
+              {/* Document content */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Document Content
+                </p>
+                <div className="rounded-sm border border-border bg-background p-4 max-h-48 overflow-y-auto">
+                  {selectedDoc.document_type === "w9_1099" ? (
+                    <div className="text-xs text-muted-foreground space-y-2">
+                      <p className="font-medium text-foreground">W-9 Request for Taxpayer Identification Number</p>
+                      <p>Under penalties of perjury, I certify that:</p>
+                      <ol className="list-decimal list-inside space-y-1 pl-2">
+                        <li>The number shown on this form is my correct taxpayer identification number</li>
+                        <li>I am not subject to backup withholding</li>
+                        <li>I am a U.S. citizen or other U.S. person</li>
+                        <li>The FATCA code(s) entered on this form (if any) indicating that I am exempt from FATCA reporting is correct</li>
+                      </ol>
+                      <p className="text-[10px] mt-3">The Internal Revenue Service does not require your consent to any provision of this document other than the certifications required to avoid backup withholding.</p>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground space-y-2">
+                      <p className="font-medium text-foreground">Independent Contractor Agreement</p>
+                      <p>This Agreement is entered into between Business Threat Solutions, LLC (&ldquo;Company&rdquo;) and the undersigned independent contractor (&ldquo;Contractor&rdquo;).</p>
+                      <p>Key terms:</p>
+                      <ul className="list-disc list-inside space-y-1 pl-2">
+                        <li>Contractor status: You are an independent contractor, not an employee</li>
+                        <li>Non-disclosure: All client information is strictly confidential</li>
+                        <li>Non-compete: You agree not to directly solicit Company clients</li>
+                        <li>Payment: Per the rate schedule agreed upon in your onboarding</li>
+                        <li>Term: This agreement remains in effect until terminated by either party</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Signature */}
               {selectedDoc.signature_data ? (
                 <div className="space-y-2">
