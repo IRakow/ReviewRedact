@@ -21,7 +21,7 @@ import type {
  * Priority: salesperson override → reseller global → default "fixed".
  */
 export function resolveCommissionPlan(
-  reseller: Pick<Reseller, "commission_plan_type" | "commission_plan_config">,
+  reseller?: Pick<Reseller, "commission_plan_type" | "commission_plan_config"> | null,
   salesperson?: Pick<Salesperson, "commission_plan_type" | "commission_plan_config"> | null,
 ): { type: CommissionPlanType; config: CommissionPlanConfig } {
   // SP-level override takes priority
@@ -34,8 +34,8 @@ export function resolveCommissionPlan(
 
   // Reseller global plan
   return {
-    type: reseller.commission_plan_type ?? "fixed",
-    config: reseller.commission_plan_config ?? {},
+    type: reseller?.commission_plan_type ?? "fixed",
+    config: reseller?.commission_plan_config ?? {},
   }
 }
 

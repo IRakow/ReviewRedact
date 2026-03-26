@@ -96,7 +96,7 @@ export default async function DashboardInvoicesPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {list.map((inv) => {
-                const client = inv.clients as { business_name: string } | null
+                const client = inv.clients as unknown as { business_name: string } | null
                 return (
                   <tr key={inv.id} className="hover:bg-surface/80">
                     <td className="px-5 py-3 font-mono text-xs text-foreground">

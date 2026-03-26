@@ -129,8 +129,8 @@ export async function GET() {
         // Resolve effective commission plan (SP override → reseller global → fixed)
         const commissionPlan = salespersonData?.parentType === "reseller"
           ? resolveCommissionPlan(
-              resellerPlan ? { type: resellerPlan.type as "fixed" | "base_split" | "percentage" | "flat_fee", config: resellerPlan.config } : undefined,
-              spPlan ? { type: spPlan.type as "fixed" | "base_split" | "percentage" | "flat_fee", config: spPlan.config } : undefined,
+              resellerPlan ? { commission_plan_type: resellerPlan.type as "fixed" | "base_split" | "percentage" | "flat_fee", commission_plan_config: resellerPlan.config } : undefined,
+              spPlan ? { commission_plan_type: spPlan.type as "fixed" | "base_split" | "percentage" | "flat_fee", commission_plan_config: spPlan.config } : undefined,
             )
           : undefined
 

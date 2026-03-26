@@ -79,7 +79,7 @@ export default async function SalespeoplePerformancePage() {
             <tbody className="divide-y divide-border">
               {spList.map((sp) => {
                 const stats = statsMap[sp.id] ?? { deals: 0, revenue: 0, commission: 0 }
-                const parentReseller = sp.resellers as { name: string } | null
+                const parentReseller = sp.resellers as unknown as { name: string } | null
                 const parentName = sp.parent_type === "owner" ? "Owner-Direct" : (parentReseller?.name ?? "—")
                 const planLabel = sp.commission_plan_type
                   ? PLAN_LABELS[sp.commission_plan_type] ?? sp.commission_plan_type

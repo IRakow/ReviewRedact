@@ -14,7 +14,7 @@ export default async function AdminLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AdminSidebarWrapper
-        resellerName={session.name}
+        userName={session.name}
         isAdmin={true}
         userType={session.user_type}
       />
