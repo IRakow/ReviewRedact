@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
+import { getResellerIdForClient, getSalespersonIdForClient, verifyClientAccess } from "@/lib/auth"
 
 export async function createClient(formData: FormData) {
   const session = await getSession()
@@ -20,21 +21,33 @@ export async function createClient(formData: FormData) {
     throw new Error("Missing required fields")
   }
 
+  const resellerId = getResellerIdForClient(session)
+  if (!resellerId && session.user_type !== "owner") {
+    throw new Error("Cannot determine reseller for this client")
+  }
+
   const supabase = createServerClient()
+
+  const insertData: Record<string, unknown> = {
+    reseller_id: resellerId ?? session.user_id, // Owner uses own ID as fallback
+    business_name: businessName.trim(),
+    owner_name: ownerName.trim(),
+    address: address.trim(),
+    business_phone: businessPhone?.trim() || null,
+    owner_phone: ownerPhone?.trim() || null,
+    owner_email: ownerEmail?.trim() || null,
+    google_url: googleUrl.trim(),
+    status: "pending",
+  }
+
+  const salespersonId = getSalespersonIdForClient(session)
+  if (salespersonId) {
+    insertData.salesperson_id = salespersonId
+  }
 
   const { data, error } = await supabase
     .from("clients")
-    .insert({
-      reseller_id: session.reseller_id,
-      business_name: businessName.trim(),
-      owner_name: ownerName.trim(),
-      address: address.trim(),
-      business_phone: businessPhone?.trim() || null,
-      owner_phone: ownerPhone?.trim() || null,
-      owner_email: ownerEmail?.trim() || null,
-      google_url: googleUrl.trim(),
-      status: "pending",
-    })
+    .insert(insertData)
     .select("id")
     .single()
 
@@ -49,22 +62,10 @@ export async function updateClient(id: string, formData: FormData) {
   const session = await getSession()
   if (!session) redirect("/")
 
+  // Verify access
+  await verifyClientAccess(session, id)
+
   const supabase = createServerClient()
-
-  // Verify ownership
-  const { data: existing } = await supabase
-    .from("clients")
-    .select("reseller_id")
-    .eq("id", id)
-    .single()
-
-  if (!existing) {
-    throw new Error("Client not found")
-  }
-
-  if (session.role !== "admin" && existing.reseller_id !== session.reseller_id) {
-    throw new Error("Unauthorized")
-  }
 
   const updates: Record<string, string | null> = {}
 

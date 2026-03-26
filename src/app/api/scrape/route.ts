@@ -30,8 +30,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 })
     }
 
-    // Verify ownership: reseller must own the client, or be admin
-    if (session.role !== "admin" && client.reseller_id !== session.reseller_id) {
+    // Verify ownership
+    const hasAccess =
+      session.user_type === "owner" ||
+      client.reseller_id === session.user_id ||
+      client.salesperson_id === session.user_id
+    if (!hasAccess) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

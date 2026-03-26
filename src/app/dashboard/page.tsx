@@ -9,6 +9,7 @@ import { Plus } from "lucide-react"
 export default async function DashboardPage() {
   const session = await getSession()
   if (!session) redirect("/")
+  if (session.user_type === "owner") redirect("/owner")
 
   const supabase = createServerClient()
 
@@ -18,9 +19,12 @@ export default async function DashboardPage() {
     .select("id, business_name, owner_name, address, status")
     .order("created_at", { ascending: false })
 
-  if (session.role !== "admin") {
-    clientsQuery.eq("reseller_id", session.reseller_id)
+  if (session.user_type === "reseller") {
+    clientsQuery.eq("reseller_id", session.user_id)
+  } else if (session.user_type === "salesperson") {
+    clientsQuery.eq("salesperson_id", session.user_id)
   }
+  // Owners see all clients
 
   const { data: clients, error: clientsError } = await clientsQuery
 

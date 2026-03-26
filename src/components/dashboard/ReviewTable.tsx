@@ -12,7 +12,7 @@ export interface ReviewRow {
   starRating: number
   reviewText: string | null
   reviewDate: string | null
-  status: "active" | "pending_removal" | "removed" | "failed"
+  status: "active" | "in_progress" | "removed" | "waiting_for_payment" | "paid" | "failed"
 }
 
 interface ReviewTableProps {
@@ -128,8 +128,10 @@ export function ReviewTable({
                   className="rounded-sm border border-border bg-surface px-2 py-1 text-[11px] text-foreground focus:border-steel focus:outline-none"
                 >
                   <option value="active">Active</option>
-                  <option value="pending_removal">Pending Removal</option>
+                  <option value="in_progress">In Progress</option>
                   <option value="removed">Removed</option>
+                  <option value="waiting_for_payment">Awaiting Payment</option>
+                  <option value="paid">Paid</option>
                   <option value="failed">Failed</option>
                 </select>
               </td>

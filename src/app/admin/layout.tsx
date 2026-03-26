@@ -9,13 +9,14 @@ export default async function AdminLayout({
 }) {
   const session = await getSession()
   if (!session) redirect("/")
-  if (session.role !== "admin") redirect("/dashboard")
+  if (session.user_type !== "owner") redirect("/dashboard")
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <AdminSidebarWrapper
         resellerName={session.name}
         isAdmin={true}
+        userType={session.user_type}
       />
       <main className="flex-1 overflow-y-auto">
         {children}

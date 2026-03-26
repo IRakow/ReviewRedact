@@ -18,22 +18,26 @@ async function generateUniquePinCode(): Promise<string> {
 
   while (attempts < maxAttempts) {
     const pin = generatePinCode()
-    const { data } = await supabase
-      .from("resellers")
-      .select("id")
-      .eq("pin_code", pin)
-      .maybeSingle()
 
-    if (!data) return pin
+    // Check uniqueness across both resellers and salespeople tables
+    const [{ data: resellerMatch }, { data: salespersonMatch }] = await Promise.all([
+      supabase.from("resellers").select("id").eq("pin_code", pin).maybeSingle(),
+      supabase.from("salespeople").select("id").eq("pin_code", pin).maybeSingle(),
+    ])
+
+    if (!resellerMatch && !salespersonMatch) return pin
     attempts++
   }
 
   throw new Error("Failed to generate unique PIN after maximum attempts")
 }
 
+// Export for reuse in settings actions
+export { generateUniquePinCode }
+
 export async function createReseller(formData: FormData) {
   const session = await getSession()
-  if (!session || session.role !== "admin") {
+  if (!session || session.user_type !== "owner") {
     return { error: "Unauthorized" }
   }
 
@@ -81,7 +85,7 @@ export async function createReseller(formData: FormData) {
 
 export async function updateReseller(id: string, formData: FormData) {
   const session = await getSession()
-  if (!session || session.role !== "admin") {
+  if (!session || session.user_type !== "owner") {
     return { error: "Unauthorized" }
   }
 
@@ -127,7 +131,7 @@ export async function updateReseller(id: string, formData: FormData) {
 
 export async function toggleResellerActive(id: string, isActive: boolean) {
   const session = await getSession()
-  if (!session || session.role !== "admin") {
+  if (!session || session.user_type !== "owner") {
     return { error: "Unauthorized" }
   }
 

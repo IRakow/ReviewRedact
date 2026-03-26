@@ -3,12 +3,13 @@
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { verifyClientAccess } from "@/lib/auth"
 
 export async function updateReviewStatus(reviewId: string, status: string) {
   const session = await getSession()
   if (!session) redirect("/")
 
-  const validStatuses = ["active", "pending_removal", "removed", "failed"]
+  const validStatuses = ["active", "in_progress", "removed", "waiting_for_payment", "paid", "failed"]
   if (!validStatuses.includes(status)) {
     throw new Error("Invalid status")
   }
@@ -18,7 +19,7 @@ export async function updateReviewStatus(reviewId: string, status: string) {
   // Verify ownership through the review's client
   const { data: review } = await supabase
     .from("reviews")
-    .select("client_id, clients(reseller_id)")
+    .select("client_id")
     .eq("id", reviewId)
     .single()
 
@@ -26,13 +27,7 @@ export async function updateReviewStatus(reviewId: string, status: string) {
     throw new Error("Review not found")
   }
 
-  const clientData = review.clients as unknown as { reseller_id: string } | null
-  if (
-    session.role !== "admin" &&
-    clientData?.reseller_id !== session.reseller_id
-  ) {
-    throw new Error("Unauthorized")
-  }
+  await verifyClientAccess(session, review.client_id)
 
   const updateData: Record<string, string | null> = { status }
   if (status === "removed") {
@@ -53,22 +48,9 @@ export async function takeSnapshot(clientId: string) {
   const session = await getSession()
   if (!session) redirect("/")
 
+  await verifyClientAccess(session, clientId)
+
   const supabase = createServerClient()
-
-  // Verify ownership
-  const { data: client } = await supabase
-    .from("clients")
-    .select("reseller_id")
-    .eq("id", clientId)
-    .single()
-
-  if (!client) {
-    throw new Error("Client not found")
-  }
-
-  if (session.role !== "admin" && client.reseller_id !== session.reseller_id) {
-    throw new Error("Unauthorized")
-  }
 
   // Compute average from active reviews
   const { data: reviews } = await supabase
@@ -99,21 +81,19 @@ export async function triggerScrape(clientId: string) {
   const session = await getSession()
   if (!session) redirect("/")
 
+  await verifyClientAccess(session, clientId)
+
   const supabase = createServerClient()
 
   // Fetch client with google_url
   const { data: client } = await supabase
     .from("clients")
-    .select("reseller_id, google_url")
+    .select("google_url")
     .eq("id", clientId)
     .single()
 
   if (!client) {
     throw new Error("Client not found")
-  }
-
-  if (session.role !== "admin" && client.reseller_id !== session.reseller_id) {
-    throw new Error("Unauthorized")
   }
 
   // Scrape directly (not via API route)

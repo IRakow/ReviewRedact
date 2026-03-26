@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify ownership
-    if (session.role !== "admin" && client.reseller_id !== session.reseller_id) {
+    const hasAccess =
+      session.user_type === "owner" ||
+      client.reseller_id === session.user_id ||
+      client.salesperson_id === session.user_id
+    if (!hasAccess) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

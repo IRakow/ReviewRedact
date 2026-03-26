@@ -42,10 +42,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
   }
 
   // Verify ownership
-  if (
-    session.role !== "admin" &&
-    client.reseller_id !== session.reseller_id
-  ) {
+  const hasAccess =
+    session.user_type === "owner" ||
+    (session.user_type === "reseller" && client.reseller_id === session.user_id) ||
+    (session.user_type === "salesperson" && client.salesperson_id === session.user_id)
+
+  if (!hasAccess) {
     notFound()
   }
 
@@ -157,10 +159,10 @@ export default async function ClientDetailPage({ params }: PageProps) {
           subtext={`${totalActive} active`}
         />
         <StatsCard
-          label="Pending Removal"
-          value={allReviews.filter((r) => r.status === "pending_removal").length}
+          label="In Progress"
+          value={allReviews.filter((r) => r.status === "in_progress").length}
           icon={<BarChart3 className="h-5 w-5" />}
-          subtext={`${allReviews.filter((r) => r.status === "removed").length} removed`}
+          subtext={`${allReviews.filter((r) => r.status === "removed" || r.status === "waiting_for_payment" || r.status === "paid").length} removed`}
         />
         <div className="rounded-md border border-border bg-surface p-5">
           <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mb-3">

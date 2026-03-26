@@ -13,8 +13,9 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <SidebarWrapper
-        resellerName={session.name}
-        isAdmin={session.role === "admin"}
+        userName={session.name}
+        isAdmin={session.user_type === "owner"}
+        userType={session.user_type}
       />
       <main className="flex-1 overflow-y-auto">
         {children}

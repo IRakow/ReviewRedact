@@ -11,9 +11,11 @@ function getSecretKey() {
 
 export async function createSession(session: Session): Promise<string> {
   const token = await new SignJWT({
-    reseller_id: session.reseller_id,
-    role: session.role,
+    user_id: session.user_id,
+    user_type: session.user_type,
     name: session.name,
+    parent_reseller_id: session.parent_reseller_id ?? null,
+    documents_signed: session.documents_signed,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -27,9 +29,11 @@ export async function verifySession(token: string): Promise<Session | null> {
   try {
     const { payload } = await jwtVerify(token, getSecretKey())
     return {
-      reseller_id: payload.reseller_id as string,
-      role: payload.role as "admin" | "reseller",
+      user_id: payload.user_id as string,
+      user_type: payload.user_type as Session["user_type"],
       name: payload.name as string,
+      parent_reseller_id: (payload.parent_reseller_id as string) ?? undefined,
+      documents_signed: payload.documents_signed as boolean,
     }
   } catch {
     return null

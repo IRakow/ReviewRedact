@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/dashboard/Sidebar"
+import type { UserRole } from "@/lib/types"
 
 interface SidebarWrapperProps {
-  resellerName: string
+  userName: string
   isAdmin: boolean
+  userType: UserRole
 }
 
-export function SidebarWrapper({ resellerName, isAdmin }: SidebarWrapperProps) {
+export function SidebarWrapper({ userName, isAdmin, userType }: SidebarWrapperProps) {
   const router = useRouter()
 
   async function handleLogout() {
@@ -18,8 +20,9 @@ export function SidebarWrapper({ resellerName, isAdmin }: SidebarWrapperProps) {
 
   return (
     <Sidebar
-      resellerName={resellerName}
+      userName={userName}
       isAdmin={isAdmin}
+      userType={userType}
       onLogout={handleLogout}
     />
   )

@@ -47,7 +47,14 @@ export function LoginPanel({
         return
       }
 
-      router.push("/dashboard")
+      // Route based on role and document signing status
+      if (!data.documents_signed && data.user_type !== "owner") {
+        router.push("/sign")
+      } else if (data.user_type === "owner") {
+        router.push("/owner")
+      } else {
+        router.push("/dashboard")
+      }
     } catch {
       setError("Connection failed")
       setLoading(false)

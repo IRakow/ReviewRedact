@@ -3,11 +3,13 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, Shield, LogOut } from "lucide-react"
+import { Users, UserCheck, Shield, LogOut, Settings, FileText } from "lucide-react"
+import type { UserRole } from "@/lib/types"
 
 interface SidebarProps {
-  resellerName: string
+  userName: string
   isAdmin: boolean
+  userType: UserRole
   onLogout: () => void
 }
 
@@ -16,18 +18,48 @@ const navItems = [
     label: "Clients",
     href: "/dashboard",
     icon: Users,
-    adminOnly: false,
+    roles: ["owner", "reseller", "salesperson"] as UserRole[],
   },
   {
-    label: "Admin",
-    href: "/admin",
+    label: "Salespeople",
+    href: "/dashboard/settings",
+    icon: UserCheck,
+    roles: ["reseller"] as UserRole[],
+  },
+  {
+    label: "Invoices",
+    href: "/dashboard/invoices",
+    icon: FileText,
+    roles: ["reseller", "salesperson"] as UserRole[],
+  },
+  {
+    label: "Owner Panel",
+    href: "/owner",
     icon: Shield,
-    adminOnly: true,
+    roles: ["owner"] as UserRole[],
   },
 ]
 
-export function Sidebar({ resellerName, isAdmin, onLogout }: SidebarProps) {
+function getRoleLabel(userType: UserRole): string {
+  switch (userType) {
+    case "owner":
+      return "Owner"
+    case "reseller":
+      return "Reseller"
+    case "salesperson":
+      return "Sales Agent"
+  }
+}
+
+function getSettingsHref(userType: UserRole): string | null {
+  if (userType === "reseller") return "/dashboard/settings"
+  if (userType === "salesperson") return "/dashboard/portal"
+  return null
+}
+
+export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps) {
   const pathname = usePathname()
+  const settingsHref = getSettingsHref(userType)
 
   return (
     <aside className="flex h-screen w-56 flex-col border-r border-sidebar-border bg-sidebar">
@@ -46,7 +78,7 @@ export function Sidebar({ resellerName, isAdmin, onLogout }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 px-2 py-3">
         {navItems
-          .filter((item) => !item.adminOnly || isAdmin)
+          .filter((item) => item.roles.includes(userType))
           .map((item) => {
             const isActive =
               item.href === "/dashboard"
@@ -77,15 +109,27 @@ export function Sidebar({ resellerName, isAdmin, onLogout }: SidebarProps) {
           })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer — name + subtle settings wheel + logout */}
       <div className="border-t border-sidebar-border p-3">
-        <div className="mb-2 px-3">
-          <p className="truncate text-xs font-medium text-sidebar-foreground">
-            {resellerName}
-          </p>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {isAdmin ? "Administrator" : "Reseller"}
-          </p>
+        <div className="mb-2 flex items-center justify-between px-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-sidebar-foreground">
+              {userName}
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {getRoleLabel(userType)}
+            </p>
+          </div>
+          {/* Settings wheel — subtle, bottom corner by name */}
+          {settingsHref && (
+            <Link
+              href={settingsHref}
+              className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
+              title="Settings"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
         <button
           onClick={onLogout}
