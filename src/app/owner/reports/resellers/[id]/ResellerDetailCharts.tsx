@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { RevenueChart } from "../../components/RevenueChart"
 import { ReportBarChart } from "../../components/ReportBarChart"
 import { DonutChart } from "../../components/DonutChart"
@@ -33,6 +34,9 @@ function ChartCard({
 }
 
 export function ResellerDetailCharts({ revenueTimeline, commissionSplitData, spBarData }: Props) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  if (!mounted) return <div className="h-[400px] animate-pulse rounded-md border border-border bg-surface" />
   return (
     <div className="space-y-6">
       {/* Revenue over time */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowRight, BarChart3, PieChart as PieIcon, TrendingUp, Trophy } from "lucide-react"
 import { RevenueChart } from "./components/RevenueChart"
@@ -67,6 +67,19 @@ export function ReportsCharts({
   topResellers,
   topSalespeople,
 }: Props) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
+  if (!mounted) {
+    return (
+      <div className="space-y-6">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-[400px] animate-pulse rounded-md border border-border bg-surface" />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Section A: Revenue Over Time */}
