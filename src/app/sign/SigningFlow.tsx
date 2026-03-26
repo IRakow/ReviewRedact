@@ -52,27 +52,37 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
     setError("")
 
     startTransition(async () => {
-      const result = await signDocument(activeDoc, data)
+      try {
+        const result = await signDocument(activeDoc, data)
 
-      if (result.error) {
-        setError(result.error)
-        return
-      }
+        if (result.error) {
+          setError(result.error)
+          return
+        }
 
-      // Update local status
-      const newStatus = { ...status, [activeDoc]: "signed" as const }
-      setStatus(newStatus)
+        // Update local status
+        const newStatus = { ...status, [activeDoc]: "signed" as const }
+        setStatus(newStatus)
 
-      // Move to next unsigned doc or finish
-      if (activeDoc === "w9_1099" && newStatus.contractor_agreement === "pending") {
-        setActiveDoc("contractor_agreement")
-      } else if (activeDoc === "contractor_agreement" && newStatus.w9_1099 === "pending") {
-        setActiveDoc("w9_1099")
-      } else {
-        // All signed — refresh session and redirect
-        setActiveDoc(null)
-        await refreshSessionAfterSigning()
-        router.push("/dashboard")
+        // Move to next unsigned doc or finish
+        if (activeDoc === "w9_1099" && newStatus.contractor_agreement === "pending") {
+          setActiveDoc("contractor_agreement")
+        } else if (activeDoc === "contractor_agreement" && newStatus.w9_1099 === "pending") {
+          setActiveDoc("w9_1099")
+        } else {
+          // All signed — refresh session and redirect
+          setActiveDoc(null)
+          try {
+            await refreshSessionAfterSigning()
+          } catch {
+            // Session refresh failed but documents are signed; redirect anyway
+          }
+          router.push("/dashboard")
+          router.refresh()
+        }
+      } catch (err) {
+        setError("Something went wrong — please try again")
+        console.error("Signing error:", err)
       }
     })
   }

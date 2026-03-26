@@ -2,7 +2,7 @@
 
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
-import { uploadJSON, downloadJSON, deleteFolder, getSignedUrl } from "@/lib/gcs"
+import { uploadJSON, downloadJSON, deleteFolder, getSignedUrl, isGCSConfigured } from "@/lib/gcs"
 import { revalidatePath } from "next/cache"
 
 const ALL_TABLES = [
@@ -23,7 +23,8 @@ export async function createSnapshot(notes?: string) {
 
   const supabase = createServerClient()
   const timestamp = new Date().toISOString()
-  const gcsPath = `backups/${timestamp}/`
+  const useGCS = isGCSConfigured()
+  const gcsPath = useGCS ? `backups/${timestamp}/` : null
 
   // Read all 13 tables in parallel
   const results = await Promise.all(
@@ -34,11 +35,6 @@ export async function createSnapshot(notes?: string) {
     })
   )
 
-  // Upload each table to GCS in parallel
-  await Promise.all(
-    results.map(({ table, rows }) => uploadJSON(gcsPath + table + ".json", rows))
-  )
-
   // Build table_counts and calculate size_bytes
   const tableCounts: Record<string, number> = {}
   let sizeBytes = 0
@@ -47,14 +43,26 @@ export async function createSnapshot(notes?: string) {
     sizeBytes += JSON.stringify(rows).length
   }
 
-  // Upload metadata to GCS
-  const metadata = {
-    trigger_type: "manual",
-    triggered_by: session.name,
-    table_counts: tableCounts,
-    timestamp,
+  if (useGCS && gcsPath) {
+    // Upload each table to GCS in parallel
+    await Promise.all(
+      results.map(({ table, rows }) => uploadJSON(gcsPath + table + ".json", rows))
+    )
+
+    // Upload metadata to GCS
+    const metadata = {
+      trigger_type: "manual",
+      triggered_by: session.name,
+      table_counts: tableCounts,
+      timestamp,
+    }
+    await uploadJSON(gcsPath + "metadata.json", metadata)
   }
-  await uploadJSON(gcsPath + "metadata.json", metadata)
+
+  // Build inline data for Supabase fallback (when no GCS)
+  const inlineData: Record<string, unknown[]> | null = useGCS
+    ? null
+    : Object.fromEntries(results.map(({ table, rows }) => [table, rows]))
 
   // Insert record into db_backups
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -70,6 +78,7 @@ export async function createSnapshot(notes?: string) {
       retention_tier: "daily",
       expires_at: expiresAt,
       notes: notes ?? null,
+      data: inlineData,
     })
     .select("id, gcs_path")
     .single()
@@ -126,6 +135,16 @@ export async function getSnapshot(id: string) {
     .single()
 
   if (error || !backup) return { error: error?.message ?? "Snapshot not found" }
+
+  // If backup has inline data (no GCS), read from the data column
+  if (backup.data && !backup.gcs_path) {
+    const tableData: Record<string, unknown[]> = {}
+    const inlineData = backup.data as Record<string, unknown[]>
+    for (const table of ALL_TABLES) {
+      tableData[table] = inlineData[table] ?? []
+    }
+    return { backup, tables: tableData }
+  }
 
   // Download all tables from GCS in parallel
   const tableData: Record<string, unknown[]> = {}
@@ -271,13 +290,18 @@ export async function exportSnapshot(snapshotId: string) {
 
   const { data: backup, error } = await supabase
     .from("db_backups")
-    .select("gcs_path")
+    .select("gcs_path, data")
     .eq("id", snapshotId)
     .single()
 
   if (error || !backup) return { error: error?.message ?? "Snapshot not found" }
 
-  // Generate signed URLs for each table file
+  // If backup has inline data (no GCS), return data directly as JSON
+  if (backup.data && !backup.gcs_path) {
+    return { data: backup.data as Record<string, unknown[]> }
+  }
+
+  // Generate signed URLs for each table file from GCS
   const urls: Record<string, string> = {}
 
   const results = await Promise.all(
@@ -316,8 +340,10 @@ export async function deleteSnapshot(snapshotId: string) {
     return { error: "Cannot delete monthly retention snapshots" }
   }
 
-  // Delete GCS folder
-  await deleteFolder(backup.gcs_path)
+  // Delete GCS folder if it exists
+  if (backup.gcs_path) {
+    await deleteFolder(backup.gcs_path)
+  }
 
   // Delete database record
   const { error: deleteError } = await supabase
@@ -355,7 +381,9 @@ export async function runCleanup() {
   if (error || !expired) return { error: error?.message ?? "No expired snapshots", deleted: 0 }
 
   for (const backup of expired) {
-    await deleteFolder(backup.gcs_path)
+    if (backup.gcs_path) {
+      await deleteFolder(backup.gcs_path)
+    }
     await supabase.from("db_backups").delete().eq("id", backup.id)
   }
 

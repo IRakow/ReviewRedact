@@ -3,7 +3,6 @@ import { Storage } from "@google-cloud/storage"
 function getStorage() {
   const keyBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   if (!keyBase64) {
-    // Fallback: return a mock storage for dev without GCS
     return null
   }
   const credentials = JSON.parse(Buffer.from(keyBase64, "base64").toString())
@@ -19,10 +18,14 @@ function getBucket() {
   return storage.bucket(process.env.GCS_BUCKET_NAME!)
 }
 
+export function isGCSConfigured(): boolean {
+  return !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY && !!process.env.GCS_BUCKET_NAME
+}
+
 export async function uploadJSON(path: string, data: unknown): Promise<void> {
   const bucket = getBucket()
   if (!bucket) {
-    console.log("[GCS] Mock upload:", path)
+    // No GCS — caller should use Supabase fallback
     return
   }
   const file = bucket.file(path)
@@ -31,7 +34,7 @@ export async function uploadJSON(path: string, data: unknown): Promise<void> {
 
 export async function downloadJSON<T = unknown>(path: string): Promise<T> {
   const bucket = getBucket()
-  if (!bucket) throw new Error("GCS not configured")
+  if (!bucket) throw new Error("GCS not configured — use Supabase data column fallback")
   const file = bucket.file(path)
   const [content] = await file.download()
   return JSON.parse(content.toString()) as T
@@ -45,14 +48,10 @@ export async function deleteFolder(pathPrefix: string): Promise<void> {
 
 export async function getSignedUrl(path: string, expiresMinutes = 60): Promise<string> {
   const bucket = getBucket()
-  if (!bucket) throw new Error("GCS not configured")
+  if (!bucket) throw new Error("GCS not configured — use Supabase data column fallback")
   const [url] = await bucket.file(path).getSignedUrl({
     action: "read",
     expires: Date.now() + expiresMinutes * 60 * 1000,
   })
   return url
-}
-
-export function isGCSConfigured(): boolean {
-  return !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY && !!process.env.GCS_BUCKET_NAME
 }

@@ -40,10 +40,23 @@ export function SignaturePad({ onSign, disabled }: SignaturePadProps) {
     ctx.lineWidth = 2
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
+    setHasDrawn(false)
   }, [])
 
   useEffect(() => {
-    if (mode === "draw") initCanvas()
+    if (mode === "draw") {
+      // Small delay to ensure canvas is rendered and has layout dimensions
+      const timer = setTimeout(initCanvas, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [mode, initCanvas])
+
+  // Re-initialize canvas on window resize
+  useEffect(() => {
+    if (mode !== "draw") return
+    const handleResize = () => initCanvas()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
   }, [mode, initCanvas])
 
   function getCanvasPoint(e: React.MouseEvent | React.TouchEvent) {
@@ -108,6 +121,12 @@ export function SignaturePad({ onSign, disabled }: SignaturePadProps) {
 
   return (
     <div className="space-y-4">
+      {/* Preload script fonts for typed signature mode */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Dancing+Script&family=Great+Vibes&family=Sacramento&display=swap"
+        rel="stylesheet"
+      />
       {/* Mode toggle */}
       <div className="flex gap-2">
         <button
@@ -200,11 +219,6 @@ export function SignaturePad({ onSign, disabled }: SignaturePadProps) {
               </button>
             ))}
           </div>
-          {/* Google Fonts link for script fonts */}
-          <link
-            href="https://fonts.googleapis.com/css2?family=Dancing+Script&family=Great+Vibes&family=Sacramento&display=swap"
-            rel="stylesheet"
-          />
         </div>
       )}
 

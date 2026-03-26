@@ -4,13 +4,14 @@ import { StatsCard } from "@/components/dashboard/StatsCard"
 import { Database, Clock, CalendarDays, HardDrive, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { listSnapshots, createSnapshot } from "./actions"
+import { revalidatePath } from "next/cache"
+import { DatabaseTimelineClient } from "./DatabaseTimelineClient"
 
 async function createSnapshotAction() {
   "use server"
   await createSnapshot("Manual snapshot from Time Machine UI")
+  revalidatePath("/owner/time-machine/database")
 }
-
-import { DatabaseTimelineClient } from "./DatabaseTimelineClient"
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`

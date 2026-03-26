@@ -47,7 +47,7 @@ export async function signDocument(
   }
 ) {
   const session = await getSession()
-  if (!session) redirect("/")
+  if (!session) return { error: "Not authenticated — please log in again" }
 
   if (session.user_type === "owner") {
     return { error: "Owners do not need to sign documents" }
@@ -58,90 +58,103 @@ export async function signDocument(
     return { error: "Invalid document type" }
   }
 
+  // Validate signature data
+  if (signaturePayload.type === "draw" && !signaturePayload.image_data) {
+    return { error: "No signature drawn — please draw your signature" }
+  }
+  if (signaturePayload.type === "typed" && !signaturePayload.typed_name?.trim()) {
+    return { error: "No name entered — please type your full name" }
+  }
+
   const signerType = session.user_type === "reseller" ? "reseller" : "salesperson"
   const supabase = createServerClient()
 
-  // Check if already signed
-  const { data: existing } = await supabase
-    .from("documents")
-    .select("id, status")
-    .eq("signer_type", signerType)
-    .eq("signer_id", session.user_id)
-    .eq("document_type", documentType)
-    .maybeSingle()
-
-  if (existing?.status === "signed") {
-    return { error: "Document already signed" }
-  }
-
-  const signatureData: SignatureData = {
-    type: signaturePayload.type,
-    image_data: signaturePayload.image_data,
-    typed_name: signaturePayload.typed_name,
-    font: signaturePayload.font,
-    ip: "server-side",
-    user_agent: "server-side",
-    timestamp: new Date().toISOString(),
-  }
-
-  if (existing) {
-    // Update existing pending document
-    const { error } = await supabase
+  try {
+    // Check if already signed
+    const { data: existing } = await supabase
       .from("documents")
-      .update({
+      .select("id, status")
+      .eq("signer_type", signerType)
+      .eq("signer_id", session.user_id)
+      .eq("document_type", documentType)
+      .maybeSingle()
+
+    if (existing?.status === "signed") {
+      return { error: "Document already signed" }
+    }
+
+    const signatureData: SignatureData = {
+      type: signaturePayload.type,
+      image_data: signaturePayload.image_data,
+      typed_name: signaturePayload.typed_name,
+      font: signaturePayload.font,
+      ip: "server-side",
+      user_agent: "server-side",
+      timestamp: new Date().toISOString(),
+    }
+
+    if (existing) {
+      // Update existing pending document
+      const { error } = await supabase
+        .from("documents")
+        .update({
+          status: "signed",
+          signature_data: signatureData,
+          signed_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+
+      if (error) return { error: error.message }
+    } else {
+      // Insert new signed document
+      const { error } = await supabase.from("documents").insert({
+        signer_type: signerType,
+        signer_id: session.user_id,
+        document_type: documentType,
         status: "signed",
         signature_data: signatureData,
         signed_at: new Date().toISOString(),
       })
-      .eq("id", existing.id)
 
-    if (error) return { error: error.message }
-  } else {
-    // Insert new signed document
-    const { error } = await supabase.from("documents").insert({
-      signer_type: signerType,
-      signer_id: session.user_id,
-      document_type: documentType,
-      status: "signed",
-      signature_data: signatureData,
-      signed_at: new Date().toISOString(),
-    })
+      if (error) return { error: error.message }
+    }
 
-    if (error) return { error: error.message }
+    // Email all owners about the signed document
+    const docLabel = documentType === "w9_1099" ? "W-9/1099 Form" : "Contractor Agreement"
+    try {
+      await resend.emails.send({
+        from: "Review Redact <contracts@reviewredact.com>",
+        to: OWNER_EMAILS,
+        subject: `Document Signed: ${docLabel} — ${session.name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+            <h2 style="color: #1a1a1a;">Document Signed</h2>
+            <p><strong>${session.name}</strong> (${signerType}) has signed their <strong>${docLabel}</strong>.</p>
+            <p>Signed at: ${new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })}</p>
+            <p>Signature type: ${signaturePayload.type === "draw" ? "Drawn signature" : "Typed signature"}</p>
+            ${signaturePayload.typed_name ? `<p>Typed name: ${signaturePayload.typed_name}</p>` : ""}
+            <br/>
+            <p style="font-size: 11px; color: #999;">This is an automated notification from ReviewRedact.</p>
+          </div>
+        `,
+      })
+    } catch {
+      // Don't fail the signing if email fails
+      console.error("Failed to send document signed notification email")
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error("signDocument error:", err)
+    return { error: "Failed to sign document — please try again" }
   }
-
-  // Email all owners about the signed document
-  const docLabel = documentType === "w9_1099" ? "W-9/1099 Form" : "Contractor Agreement"
-  try {
-    await resend.emails.send({
-      from: "Review Redact <contracts@reviewredact.com>",
-      to: OWNER_EMAILS,
-      subject: `Document Signed: ${docLabel} — ${session.name}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <h2 style="color: #1a1a1a;">Document Signed</h2>
-          <p><strong>${session.name}</strong> (${signerType}) has signed their <strong>${docLabel}</strong>.</p>
-          <p>Signed at: ${new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })}</p>
-          <p>Signature type: ${signaturePayload.type === "draw" ? "Drawn signature" : "Typed signature"}</p>
-          ${signaturePayload.typed_name ? `<p>Typed name: ${signaturePayload.typed_name}</p>` : ""}
-          <br/>
-          <p style="font-size: 11px; color: #999;">This is an automated notification from ReviewRedact.</p>
-        </div>
-      `,
-    })
-  } catch {
-    // Don't fail the signing if email fails
-    console.error("Failed to send document signed notification email")
-  }
-
-  return { success: true }
 }
 
 export async function refreshSessionAfterSigning() {
   const session = await getSession()
-  if (!session) redirect("/")
+  if (!session) return { error: "Not authenticated" }
 
-  if (session.user_type === "owner") return
+  if (session.user_type === "owner") return { documents_signed: true }
 
   const supabase = createServerClient()
   const signerType = session.user_type === "reseller" ? "reseller" : "salesperson"
