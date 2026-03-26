@@ -5,7 +5,17 @@ import { createServerClient } from "@/lib/supabase/server"
 import { StatsCard } from "@/components/dashboard/StatsCard"
 import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { Button } from "@/components/ui/button"
-import { Users, DollarSign, ArrowLeft, Plus, UserCheck, UserX } from "lucide-react"
+import { Users, DollarSign, ArrowLeft, Plus, UserCheck, UserX, Settings2 } from "lucide-react"
+import { CommissionPlanForm } from "./CommissionPlanForm"
+import { updateGlobalCommissionPlan } from "./actions"
+import type { CommissionPlanType, CommissionPlanConfig } from "@/lib/types"
+
+const PLAN_LABELS: Record<string, string> = {
+  fixed: "Fixed",
+  base_split: "Base + Split",
+  percentage: "Percentage",
+  flat_fee: "Flat Fee",
+}
 
 export default async function ResellerSettingsPage() {
   const session = await getSession()
@@ -14,10 +24,20 @@ export default async function ResellerSettingsPage() {
 
   const supabase = createServerClient()
 
+  // Fetch reseller commission plan
+  const { data: reseller } = await supabase
+    .from("resellers")
+    .select("commission_plan_type, commission_plan_config")
+    .eq("id", session.user_id)
+    .single()
+
+  const planType: CommissionPlanType = reseller?.commission_plan_type ?? "fixed"
+  const planConfig: CommissionPlanConfig = reseller?.commission_plan_config ?? {}
+
   // Fetch salespeople under this reseller
   const { data: salespeople } = await supabase
     .from("salespeople")
-    .select("id, name, email, cell, base_rate_google, display_price_google, is_active, created_at")
+    .select("id, name, email, cell, base_rate_google, display_price_google, is_active, commission_plan_type, commission_plan_config, created_at")
     .eq("reseller_id", session.user_id)
     .order("created_at", { ascending: false })
 
@@ -56,6 +76,24 @@ export default async function ResellerSettingsPage() {
         />
       </div>
 
+      {/* Commission Plan */}
+      <div className="rounded-md border border-border bg-surface">
+        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+          <Settings2 className="h-4 w-4 text-steel" />
+          <h2 className="text-sm font-semibold text-foreground">Commission Plan</h2>
+        </div>
+        <div className="px-5 py-4">
+          <p className="mb-4 text-xs text-muted-foreground">
+            Set the default commission structure for all salespeople. Individual overrides can be set per salesperson.
+          </p>
+          <CommissionPlanForm
+            currentType={planType}
+            currentConfig={planConfig}
+            onSave={updateGlobalCommissionPlan}
+          />
+        </div>
+      </div>
+
       {/* Salespeople table */}
       <div className="rounded-md border border-border bg-surface">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
@@ -86,6 +124,7 @@ export default async function ResellerSettingsPage() {
                 <th className="px-5 py-3 text-left">Name</th>
                 <th className="px-5 py-3 text-left">Email</th>
                 <th className="px-5 py-3 text-left">Base Rate</th>
+                <th className="px-5 py-3 text-left">Plan</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-left"></th>
               </tr>
@@ -105,6 +144,13 @@ export default async function ResellerSettingsPage() {
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">{sp.email}</td>
                   <td className="px-5 py-3 font-mono text-foreground">${sp.base_rate_google}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs text-muted-foreground">
+                      {sp.commission_plan_type
+                        ? PLAN_LABELS[sp.commission_plan_type] ?? sp.commission_plan_type
+                        : "Global"}
+                    </span>
+                  </td>
                   <td className="px-5 py-3">
                     <StatusBadge status={sp.is_active ? "active" : "paused"} />
                   </td>

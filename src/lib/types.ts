@@ -14,12 +14,22 @@ export interface Reseller {
   base_rate_google: number
   base_rate_facebook: number
   role: "owner" | "reseller"
+  commission_plan_type: CommissionPlanType
+  commission_plan_config: CommissionPlanConfig
   is_active: boolean
   created_at: string
   updated_at: string
 }
 
 export type PricingPlan = "reseller_set" | "owner_plan_a" | "owner_plan_b"
+
+export type CommissionPlanType = "fixed" | "base_split" | "percentage" | "flat_fee"
+
+export interface CommissionPlanConfig {
+  split_sp_pct?: number    // base_split: SP gets this % of overage (0-100)
+  sp_margin_pct?: number   // percentage: SP gets this % of margin above BTS base (0-100)
+  sp_flat_fee?: number     // flat_fee: SP gets this flat $ per deal
+}
 export type ParentType = "reseller" | "owner"
 
 export interface Salesperson {
@@ -36,6 +46,8 @@ export interface Salesperson {
   pricing_plan: PricingPlan | null
   base_rate_google: number
   display_price_google: number | null
+  commission_plan_type: CommissionPlanType | null
+  commission_plan_config: CommissionPlanConfig | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -229,6 +241,27 @@ export interface Notification {
   read: boolean
   metadata: Record<string, unknown> | null
   created_at: string
+}
+
+// ─── Prospects ──────────────────────────────────────────────────────────────
+
+export interface Prospect {
+  id: string
+  created_by_type: "owner" | "reseller" | "salesperson"
+  created_by_id: string
+  contact_name: string | null
+  company_name: string | null
+  phone: string | null
+  google_url: string
+  notes: string | null
+  status: "prospect" | "converted" | "lost"
+  review_snapshot: Array<{ reviewer_name: string; star_rating: number; review_text: string | null; review_date: string | null }> | null
+  selected_review_ids: string[] | null
+  original_rating: number | null
+  projected_rating: number | null
+  converted_client_id: string | null
+  created_at: string
+  updated_at: string
 }
 
 // ─── Commission Splits ──────────────────────────────────────────────────────

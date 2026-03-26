@@ -2,7 +2,8 @@ import { redirect } from "next/navigation"
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import Link from "next/link"
-import { BarChart3, DollarSign, FileText, AlertTriangle, Download, ShieldCheck } from "lucide-react"
+import { StatsCard } from "@/components/dashboard/StatsCard"
+import { DollarSign, ShieldCheck, TrendingUp, Users, ArrowRight } from "lucide-react"
 
 export default async function OwnerReportsPage() {
   const session = await getSession()
@@ -11,91 +12,99 @@ export default async function OwnerReportsPage() {
   const supabase = createServerClient()
 
   // Fetch summary data
-  const [
-    { data: invoices },
-    { data: payouts },
-  ] = await Promise.all([
+  const [{ data: invoices }, { data: clients }] = await Promise.all([
     supabase.from("invoices").select("status, total_amount, bts_base_amount, reseller_amount, salesperson_amount"),
-    supabase.from("payouts").select("status, amount"),
+    supabase.from("clients").select("id, status"),
   ])
 
   const paidInvoices = (invoices ?? []).filter((i) => i.status === "paid")
   const totalRevenue = paidInvoices.reduce((s, i) => s + Number(i.total_amount), 0)
   const totalBtsRetained = paidInvoices.reduce((s, i) => s + Number(i.bts_base_amount), 0)
-  const totalResellerPaid = paidInvoices.reduce((s, i) => s + Number(i.reseller_amount), 0)
-  const totalSpPaid = paidInvoices.reduce((s, i) => s + Number(i.salesperson_amount), 0)
-  const pendingPayouts = (payouts ?? []).filter((p) => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0)
+  const totalCommissions = paidInvoices.reduce(
+    (s, i) => s + Number(i.reseller_amount) + Number(i.salesperson_amount),
+    0
+  )
+  const activeClients = (clients ?? []).filter(
+    (c) => c.status === "active" || c.status === "in_progress"
+  ).length
 
-  const reports = [
+  const quickLinks = [
     {
-      title: "Revenue Report",
-      description: "Total revenue by period, reseller, and salesperson",
-      icon: DollarSign,
-      stats: `$${totalRevenue.toLocaleString()} total`,
-      href: "/owner/invoices",
+      title: "Reseller Performance",
+      description: "Revenue, team size, and commission stats for each reseller",
+      href: "/owner/reports/resellers",
+      icon: Users,
     },
     {
-      title: "Commission Breakdown",
-      description: "BTS retained, reseller cuts, salesperson cuts per deal",
-      icon: BarChart3,
-      stats: `BTS: $${totalBtsRetained.toLocaleString()} | Resellers: $${totalResellerPaid.toLocaleString()} | SP: $${totalSpPaid.toLocaleString()}`,
-      href: "/owner/invoices",
-    },
-    {
-      title: "Outstanding Invoices",
-      description: "Unpaid and overdue invoices with aging",
-      icon: AlertTriangle,
-      stats: `${(invoices ?? []).filter((i) => i.status === "sent" || i.status === "overdue").length} outstanding`,
-      href: "/owner/invoices",
-    },
-    {
-      title: "Payout Report",
-      description: "What BTS owes / has paid to resellers and salespeople",
-      icon: FileText,
-      stats: `$${pendingPayouts.toLocaleString()} pending payouts`,
-      href: "/owner/payments",
-    },
-    {
-      title: "Compliance Audit",
-      description: "Double-dipping detection — flags plan violations by owner-direct salespeople",
-      icon: ShieldCheck,
-      stats: "Check plan rule compliance",
-      href: "/owner/salespeople",
+      title: "Salesperson Performance",
+      description: "All salespeople across resellers and owner-direct",
+      href: "/owner/reports/salespeople",
+      icon: TrendingUp,
     },
   ]
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Reports</h1>
-          <p className="mt-1 text-sm text-muted-foreground">CPA-grade accounting and compliance reports</p>
-        </div>
-        <button className="flex items-center gap-2 rounded-sm border border-steel/30 bg-steel/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-steel hover:bg-steel/20">
-          <Download className="h-3.5 w-3.5" />
-          Export All (CSV)
-        </button>
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Analytics</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Revenue, commissions, and team performance</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {reports.map((report) => (
-          <Link
-            key={report.title}
-            href={report.href}
-            className="group rounded-md border border-border bg-surface p-5 transition-all hover:border-steel/30 hover:bg-steel/5"
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-steel/20 bg-steel/10 text-steel">
-                <report.icon className="h-5 w-5" />
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatsCard
+          label="Total Revenue"
+          value={`$${totalRevenue.toLocaleString()}`}
+          icon={<DollarSign className="h-5 w-5" />}
+          subtext="from paid invoices"
+        />
+        <StatsCard
+          label="BTS Retained"
+          value={`$${totalBtsRetained.toLocaleString()}`}
+          icon={<ShieldCheck className="h-5 w-5" />}
+          subtext="base amount"
+        />
+        <StatsCard
+          label="Commissions Paid"
+          value={`$${totalCommissions.toLocaleString()}`}
+          icon={<TrendingUp className="h-5 w-5" />}
+          subtext="reseller + SP"
+        />
+        <StatsCard
+          label="Active Clients"
+          value={activeClients}
+          icon={<Users className="h-5 w-5" />}
+          subtext="active or in progress"
+        />
+      </div>
+
+      {/* Quick links */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Reports</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {quickLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="group rounded-md border border-border bg-surface p-5 transition-all hover:border-steel/30 hover:bg-steel/5"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-steel/20 bg-steel/10 text-steel">
+                  <link.icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-foreground group-hover:text-steel">
+                      {link.title}
+                    </h3>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{link.description}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-foreground group-hover:text-steel">{report.title}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{report.description}</p>
-                <p className="text-xs font-mono text-steel mt-2">{report.stats}</p>
-              </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )

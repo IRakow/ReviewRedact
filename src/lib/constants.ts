@@ -14,6 +14,8 @@ export const OWNER_DIRECT_PLAN_A_MAX = 1000
 // Owner-direct salesperson Plan B: $1K base to BTS, keep everything above
 export const OWNER_DIRECT_PLAN_B_BASE = 1000
 
+export const OWNER_DIRECT_SP_BASE = 750
+
 // Legacy constants (used in contract generation)
 export const BASE_RATE_GOOGLE = BTS_BASE_RATE
 export const BASE_RATE_FACEBOOK = BTS_BASE_RATE_FACEBOOK

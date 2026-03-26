@@ -151,6 +151,49 @@ export async function toggleSalespersonActive(id: string, isActive: boolean) {
   return { success: true }
 }
 
+export async function updateGlobalCommissionPlan(formData: FormData) {
+  const session = await getSession()
+  if (!session || session.user_type !== "reseller") return { error: "Unauthorized" }
+
+  const planType = formData.get("plan_type") as string
+  const configJson = formData.get("config") as string
+
+  if (!["fixed", "base_split", "percentage", "flat_fee"].includes(planType)) {
+    return { error: "Invalid plan type" }
+  }
+
+  const config = configJson ? JSON.parse(configJson) : {}
+
+  const supabase = createServerClient()
+  const { error } = await supabase
+    .from("resellers")
+    .update({ commission_plan_type: planType, commission_plan_config: config })
+    .eq("id", session.user_id)
+
+  if (error) return { error: error.message }
+  revalidatePath("/dashboard/settings")
+  return { success: true }
+}
+
+export async function updateSalespersonCommissionPlan(spId: string, planType: string | null, config: Record<string, unknown> | null) {
+  const session = await getSession()
+  if (!session || session.user_type !== "reseller") return { error: "Unauthorized" }
+
+  const supabase = createServerClient()
+
+  const { data: sp } = await supabase.from("salespeople").select("reseller_id").eq("id", spId).single()
+  if (!sp || sp.reseller_id !== session.user_id) return { error: "Not found" }
+
+  const { error } = await supabase
+    .from("salespeople")
+    .update({ commission_plan_type: planType, commission_plan_config: config, updated_at: new Date().toISOString() })
+    .eq("id", spId)
+
+  if (error) return { error: error.message }
+  revalidatePath("/dashboard/settings")
+  return { success: true }
+}
+
 export async function setDealOverride(salespersonId: string, clientId: string, rate: number) {
   const session = await getSession()
   if (!session || session.user_type !== "reseller") {

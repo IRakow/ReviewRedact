@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, UserCheck, Shield, LogOut, Settings, FileText } from "lucide-react"
+import { Users, UserCheck, Shield, LogOut, Settings, FileText, PhoneCall, UserPlus } from "lucide-react"
 import type { UserRole } from "@/lib/types"
 
 interface SidebarProps {
@@ -18,6 +18,18 @@ const navItems = [
     label: "Clients",
     href: "/dashboard",
     icon: Users,
+    roles: ["owner", "reseller", "salesperson"] as UserRole[],
+  },
+  {
+    label: "Prospect",
+    href: "/dashboard/prospect",
+    icon: PhoneCall,
+    roles: ["owner", "reseller", "salesperson"] as UserRole[],
+  },
+  {
+    label: "Leads",
+    href: "/dashboard/prospects",
+    icon: UserPlus,
     roles: ["owner", "reseller", "salesperson"] as UserRole[],
   },
   {
@@ -83,7 +95,11 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard" || pathname.startsWith("/dashboard/clients")
-                : pathname.startsWith(item.href)
+                : item.href === "/dashboard/prospect"
+                  ? pathname === "/dashboard/prospect"
+                  : item.href === "/dashboard/prospects"
+                    ? pathname === "/dashboard/prospects" || pathname.startsWith("/dashboard/prospects/")
+                    : pathname.startsWith(item.href)
 
             return (
               <Link

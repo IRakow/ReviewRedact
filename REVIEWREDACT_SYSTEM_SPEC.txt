@@ -1,0 +1,1276 @@
+================================================================================
+  REVIEWREDACT — COMPLETE SYSTEM SPECIFICATION
+  Business Threat Solutions, LLC
+  Generated: 2026-03-25
+================================================================================
+
+
+TABLE OF CONTENTS
+─────────────────
+  1.  Overview
+  2.  Tech Stack
+  3.  User Roles & Hierarchy
+  4.  Login & Authentication Flow
+  5.  Session Management
+  6.  Proxy (Routing & Access Control)
+  7.  Document Signing Gate
+  8.  Owner Panel (/owner)
+  9.  Reseller Dashboard (/dashboard)
+  10. Salesperson Dashboard (/dashboard)
+  11. Client Management
+  12. Review Scraping System
+  13. Contract Generation
+  14. Invoicing System
+  15. Payment Processing
+  16. Commission Splits & Money Flow
+  17. Notifications & Email
+  18. Cron Jobs (Automated Tasks)
+  19. Rate Overrides
+  20. Database Schema (All Tables)
+  21. Pricing Constants
+  22. Environment Variables
+  23. API Endpoint Reference
+  24. Decision Trees
+
+
+================================================================================
+1. OVERVIEW
+================================================================================
+
+ReviewRedact is a proprietary service by Business Threat Solutions (BTS), a
+Missouri LLC, that removes inaccurate/unfair negative Google Reviews and
+Facebook posts. The service is sold exclusively through independent resellers
+— never marketed directly to the public.
+
+The application is an invite-only sales portal where resellers log in with
+Name + 6-digit PIN, onboard clients, auto-scrape their Google reviews, select
+reviews for removal via an impact calculator, generate pre-filled DRMC
+contracts, and manage the full removal-to-payment lifecycle.
+
+Key facts:
+  - 98% success rate on review removals
+  - Google removals: 8-14 day turnaround
+  - Facebook removals: 3-5 day turnaround
+  - Base fee to BTS: $850/Google removal, $500/Facebook removal
+  - Invoices due within 24 hours of removal
+  - Auto-scrape in-progress reviews 3x daily
+
+
+================================================================================
+2. TECH STACK
+================================================================================
+
+Framework:        Next.js 16.2.1 (App Router, Turbopack)
+Language:         TypeScript
+Database:         Supabase (PostgreSQL 17, us-west-1)
+Auth:             Custom PIN-based (no Supabase Auth), JWT sessions via jose
+Email:            Resend API
+Review Scraping:  Outscraper API v3
+Payments:         Valor Pay (credit card) + ACH
+PDF Generation:   pdf-lib
+3D Landing Page:  React Three Fiber + Three.js + Framer Motion
+UI:               Tailwind CSS + shadcn/ui
+Deployment:       Vercel
+
+Supabase Project: qvqvomemfjyfpduepmqu
+Supabase URL:     https://qvqvomemfjyfpduepmqu.supabase.co
+
+
+================================================================================
+3. USER ROLES & HIERARCHY
+================================================================================
+
+There are 4 user roles in a hierarchical structure:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              OWNERS (3)                                     │
+│         Ian Rakow, Blair Stover, Victor Kawana                             │
+│         Full system access. 2 of 3 are CPAs.                               │
+│                                                                             │
+│    ┌────────────────────────┐     ┌────────────────────────────────┐        │
+│    │     RESELLERS           │     │   OWNER-DIRECT SALESPEOPLE     │        │
+│    │  Invited by owners      │     │   Report directly to owners    │        │
+│    │  $850 base per removal  │     │   Plan A or Plan B pricing     │        │
+│    │  Keep everything above  │     │                                │        │
+│    │                         │     │                                │        │
+│    │  ┌───────────────────┐  │     └────────────────────────────────┘        │
+│    │  │ RESELLER-          │  │                                              │
+│    │  │ SALESPEOPLE        │  │                                              │
+│    │  │ Report to reseller │  │                                              │
+│    │  │ $1K min base rate  │  │                                              │
+│    │  └───────────────────┘  │                                              │
+│    └────────────────────────┘                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+ROLE DETAILS:
+
+  OWNER
+    - Stored in: resellers table with role = "owner"
+    - Session user_type: "owner"
+    - Access: /owner panel — sees everything
+    - No document signing required
+    - Can manage resellers, salespeople, clients, invoices, payments, reports
+    - Receives email copies of all invoices and overdue alerts
+
+  RESELLER
+    - Stored in: resellers table with role = "reseller"
+    - Session user_type: "reseller"
+    - Access: /dashboard
+    - Must sign 1099 + contractor agreement before access
+    - BTS charges them $850/removal, they charge clients whatever they want
+    - Can add/manage their own salespeople via settings panel
+    - Can set rates for their salespeople (minimum $1,000)
+
+  RESELLER-SALESPERSON
+    - Stored in: salespeople table with parent_type = "reseller"
+    - Session user_type: "salesperson"
+    - Access: /dashboard (sees only their assigned clients)
+    - Must sign 1099 + contractor agreement before access
+    - pricing_plan = "reseller_set" (reseller controls their rate)
+    - Minimum base rate: $1,000
+
+  OWNER-DIRECT SALESPERSON
+    - Stored in: salespeople table with parent_type = "owner"
+    - Session user_type: "salesperson"
+    - reseller_id = null
+    - Access: /dashboard (sees only their assigned clients)
+    - Must sign 1099 + contractor agreement before access
+    - pricing_plan = "owner_plan_a" OR "owner_plan_b" (owner decides)
+
+
+================================================================================
+4. LOGIN & AUTHENTICATION FLOW
+================================================================================
+
+ENTRY POINT: Homepage (/) — 3D Vault Room with LoginPanel overlay
+
+All users log in through the same form:
+  - Field 1: Name (text, case-insensitive matching)
+  - Field 2: 6-digit PIN code (numeric only)
+
+LOGIN DECISION TREE:
+────────────────────
+
+  User submits Name + PIN
+       │
+       ▼
+  POST /api/auth/login
+       │
+       ├── Validate: name present, code present, code.length === 6
+       │   └── FAIL → 400 "Invalid credentials"
+       │
+       ▼
+  Query: resellers table
+    SELECT id, name, role, is_active, pin_code
+    WHERE name ILIKE $name AND pin_code = $code
+    LIMIT 1 (single)
+       │
+       ├── FOUND in resellers table
+       │       │
+       │       ├── is_active === false → 403 "Account deactivated"
+       │       │
+       │       ├── role === "owner"
+       │       │       │
+       │       │       └── Create session:
+       │       │             user_type: "owner"
+       │       │             documents_signed: true (owners skip signing)
+       │       │             → Return { user_type: "owner", documents_signed: true }
+       │       │
+       │       └── role === "reseller"
+       │               │
+       │               ▼
+       │           Query: documents table
+       │             WHERE signer_type = "reseller"
+       │             AND signer_id = reseller.id
+       │             AND status = "signed"
+       │               │
+       │               ├── Has BOTH "w9_1099" AND "contractor_agreement" signed
+       │               │       └── documents_signed: true
+       │               │
+       │               └── Missing one or both
+       │                       └── documents_signed: false
+       │               │
+       │               └── Create session:
+       │                     user_type: "reseller"
+       │                     documents_signed: <computed>
+       │                     → Return { user_type: "reseller", documents_signed }
+       │
+       └── NOT FOUND in resellers table
+               │
+               ▼
+           Query: salespeople table
+             SELECT id, name, reseller_id, parent_type, is_active, pin_code
+             WHERE name ILIKE $name AND pin_code = $code
+             LIMIT 1 (single)
+               │
+               ├── FOUND in salespeople table
+               │       │
+               │       ├── is_active === false → 403 "Account deactivated"
+               │       │
+               │       ▼
+               │   Query: documents table
+               │     WHERE signer_type = "salesperson"
+               │     AND signer_id = salesperson.id
+               │     AND status = "signed"
+               │       │
+               │       └── Create session:
+               │             user_type: "salesperson"
+               │             parent_reseller_id: salesperson.reseller_id (or undefined)
+               │             documents_signed: <has both docs signed>
+               │             → Return { user_type: "salesperson", documents_signed }
+               │
+               └── NOT FOUND in salespeople table
+                       └── 401 "Access Denied"
+
+
+CLIENT-SIDE ROUTING AFTER LOGIN:
+────────────────────────────────
+
+  LoginPanel receives response
+       │
+       ├── documents_signed === false AND user_type !== "owner"
+       │       └── router.push("/sign")
+       │
+       ├── user_type === "owner"
+       │       └── router.push("/owner")
+       │
+       └── Otherwise (signed reseller or salesperson)
+               └── router.push("/dashboard")
+
+
+================================================================================
+5. SESSION MANAGEMENT
+================================================================================
+
+SESSION STRUCTURE (stored in JWT):
+  {
+    user_id:             string    // UUID from resellers or salespeople table
+    user_type:           "owner" | "reseller" | "salesperson"
+    name:                string    // Display name
+    parent_reseller_id:  string?   // Only for salespeople under a reseller
+    documents_signed:    boolean   // Whether required docs are signed
+  }
+
+JWT DETAILS:
+  Algorithm:   HS256
+  Secret:      SESSION_SECRET environment variable
+  Expiration:  7 days (604,800 seconds)
+  Library:     jose (SignJWT / jwtVerify)
+
+COOKIE DETAILS:
+  Name:        rr_session
+  Path:        /
+  HttpOnly:    true
+  Secure:      true (production only)
+  SameSite:    lax
+  Max-Age:     604,800 seconds (7 days)
+
+FUNCTIONS:
+  createSession(session)    → Signs JWT, returns token string
+  verifySession(token)      → Verifies JWT, returns Session or null
+  getSession()              → Reads cookie, calls verifySession
+  setSessionCookie(token)   → Sets the rr_session cookie
+  clearSessionCookie()      → Deletes the rr_session cookie
+
+
+================================================================================
+6. PROXY (ROUTING & ACCESS CONTROL)
+================================================================================
+
+File: src/proxy.ts (Next.js 16 convention — replaces deprecated middleware.ts)
+Export: export async function proxy(request: NextRequest)
+
+Runs on EVERY request matching:
+  /((?!_next/static|_next/image|favicon.ico|.*\.(svg|png|jpg|jpeg|gif|webp)$).*)
+
+PROXY DECISION TREE:
+─────────────────────
+
+  Incoming request
+       │
+       ▼
+  Is it a PUBLIC route?
+  (/, /api/auth/*, /pay/*, /api/cron/*, /api/webhooks/*)
+       │
+       ├── YES
+       │    │
+       │    ├── pathname === "/" AND has session cookie?
+       │    │       │
+       │    │       ├── Valid session, user_type === "owner"
+       │    │       │       └── REDIRECT → /owner
+       │    │       │
+       │    │       ├── Valid session, documents_signed === false, not owner
+       │    │       │       └── REDIRECT → /sign
+       │    │       │
+       │    │       ├── Valid session, documents signed
+       │    │       │       └── REDIRECT → /dashboard
+       │    │       │
+       │    │       └── Invalid/no session → show login page
+       │    │
+       │    ├── pathname starts with /api/cron/?
+       │    │       │
+       │    │       ├── Authorization header matches Bearer $CRON_SECRET
+       │    │       │       └── ALLOW
+       │    │       │
+       │    │       └── Missing/wrong secret → 401 Unauthorized
+       │    │
+       │    └── All other public routes → ALLOW
+       │
+       └── NO (protected route)
+            │
+            ├── No session cookie?
+            │       └── REDIRECT → / (login)
+            │
+            ├── Invalid/expired session?
+            │       └── Delete cookie, REDIRECT → / (login)
+            │
+            ├── documents_signed === false AND user_type !== "owner"?
+            │    AND NOT on /sign or /api/auth?
+            │       └── REDIRECT → /sign
+            │
+            ├── pathname starts with /sign?
+            │       └── ALLOW (signed users see completion status)
+            │
+            ├── pathname starts with /owner?
+            │       │
+            │       ├── user_type === "owner" → ALLOW
+            │       └── user_type !== "owner" → REDIRECT → /dashboard
+            │
+            ├── pathname starts with /admin? (backward compat)
+            │       │
+            │       ├── user_type === "owner" → REDIRECT → /owner
+            │       └── user_type !== "owner" → REDIRECT → /dashboard
+            │
+            ├── pathname starts with /dashboard or /api/?
+            │       └── ALLOW
+            │
+            └── All other routes → ALLOW
+
+
+================================================================================
+7. DOCUMENT SIGNING GATE
+================================================================================
+
+Route: /sign
+Component: SigningFlow (client component)
+
+All non-owners MUST sign two documents before accessing the system:
+  1. W-9 / 1099 Tax Form (document_type: "w9_1099")
+  2. Independent Contractor Agreement (document_type: "contractor_agreement")
+
+SIGNING FLOW:
+─────────────
+
+  User lands on /sign
+       │
+       ├── user_type === "owner" → redirect to /owner (owners don't sign)
+       │
+       ▼
+  Fetch existing documents from DB:
+    SELECT document_type, status
+    FROM documents
+    WHERE signer_type = $userType AND signer_id = $userId
+       │
+       ▼
+  Display signing UI:
+    - Document checklist (shows signed/pending for each)
+    - Current document content
+    - SignaturePad component
+       │
+       ▼
+  User signs a document:
+    - Can DRAW signature (canvas-based) or TYPE signature (font selection)
+    - Signature data captured:
+        {
+          type: "draw" | "typed"
+          image_data?: string      // base64 for drawn
+          typed_name?: string      // text for typed
+          font?: string            // font family for typed
+          ip: string               // client IP
+          user_agent: string       // browser user agent
+          timestamp: string        // ISO timestamp
+        }
+       │
+       ▼
+  Server action: signDocument()
+    - Upserts document record in documents table
+    - Sets status = "signed", signed_at = now
+    - Stores signature_data as JSONB
+    - Sends notification email to all OWNER_EMAILS
+       │
+       ▼
+  Both documents signed?
+       │
+       ├── NO → Show next document to sign
+       │
+       └── YES
+            │
+            ▼
+       refreshSessionAfterSigning()
+         - Re-creates session with documents_signed: true
+         - Sets new cookie
+         - User can now access /dashboard
+
+
+================================================================================
+8. OWNER PANEL (/owner)
+================================================================================
+
+Layout: src/app/owner/layout.tsx
+  - Guard: session.user_type !== "owner" → redirect /dashboard
+  - Sidebar: OwnerSidebar component
+
+OWNER SIDEBAR NAVIGATION:
+  Dashboard        /owner                  LayoutDashboard icon
+  Resellers        /owner/resellers        Users icon
+  Salespeople      /owner/salespeople      UserCheck icon
+  Clients          /owner/clients          Building2 icon
+  Invoices         /owner/invoices         FileText icon
+  Payments         /owner/payments         CreditCard icon
+  Documents        /owner/documents        FolderOpen icon
+  Reports          /owner/reports          BarChart3 icon
+  Rate Overrides   /owner/overrides        Sliders icon
+
+OWNER DASHBOARD (/owner):
+  Top stats (4 cards):
+    - Reseller count (role = "reseller" only)
+    - Salesperson count (all salespeople)
+    - Total client count
+    - Reviews removed count (status in: removed, waiting_for_payment, paid)
+
+  Financial stats (3 cards):
+    - Total revenue (sum of paid invoice amounts)
+    - Pending invoices (status = "sent")
+    - Overdue count (status = "overdue")
+
+  Two panels:
+    - Recent Invoices: last 10, showing amount + status + date
+    - Recent Activity: last 10 notifications, showing subject + event_type
+
+RESELLERS PAGE (/owner/resellers):
+  - Lists all resellers (role = "reseller") with name, email, company, status
+  - Shows base_rate_google for each
+  - Count of their salespeople
+  - Count of their clients
+
+SALESPEOPLE PAGE (/owner/salespeople):
+  - Lists ALL salespeople (reseller + owner-direct)
+  - Shows parent_type, pricing_plan, base_rate_google
+  - Link to add new salesperson (/owner/salespeople/new)
+
+ADD SALESPERSON (/owner/salespeople/new):
+  - Form: name, email, cell, company, pricing_plan, base_rate_google
+  - For owner-direct: reseller_id = null, parent_type = "owner"
+  - Auto-generates unique 6-digit PIN
+  - Creates pending document records (w9_1099 + contractor_agreement)
+
+CLIENTS PAGE (/owner/clients):
+  - Lists ALL clients across all resellers/salespeople
+  - Shows business_name, owner_name, status, reseller name, salesperson name
+
+INVOICES PAGE (/owner/invoices):
+  - Lists all invoices with amount, status, client, dates
+
+PAYMENTS PAGE (/owner/payments):
+  - Lists all payments with amount, method, status
+
+DOCUMENTS PAGE (/owner/documents):
+  - Lists all signing documents across all users
+  - Shows signer name, type, document_type, status, signed_at
+
+REPORTS PAGE (/owner/reports):
+  - Revenue by reseller
+  - Revenue by time period
+  - Commission breakdown
+
+RATE OVERRIDES PAGE (/owner/overrides):
+  - Lists all active rate overrides
+  - Who set it, who it targets, rate amount
+
+
+================================================================================
+9. RESELLER DASHBOARD (/dashboard)
+================================================================================
+
+Layout: src/app/dashboard/layout.tsx
+  - Sidebar component with role-based navigation
+
+RESELLER SIDEBAR NAVIGATION:
+  Clients          /dashboard              Users icon
+  Salespeople      /dashboard/settings     UserCheck icon
+  Invoices         /dashboard/invoices     FileText icon
+  Owner Panel      /owner                  Shield icon (only for owners)
+  [Settings gear]  /dashboard/settings     Settings icon (footer, subtle)
+
+DASHBOARD HOME (/dashboard):
+  - Shows ONLY clients where reseller_id = session.user_id
+  - Client list with: business_name, owner_name, address, status, review count, avg rating
+  - "Add Client" button → /dashboard/clients/new
+  - ClientSearch component with search/filter
+
+RESELLER SETTINGS (/dashboard/settings):
+  - Header: "Manage your salespeople and rates"
+  - Stats: salesperson count, base rate ($850)
+  - Table of salespeople under this reseller:
+    - Name, email, base_rate_google, status (active/inactive)
+    - Edit link for each
+  - "Add Salesperson" button → /dashboard/settings/salespeople/new
+
+ADD SALESPERSON (reseller):
+  - Form: name, email, cell, company, base_rate_google
+  - base_rate_google must be >= $1,000 (RESELLER_SALESPERSON_MIN_RATE)
+  - Auto-generates unique PIN
+  - Sets parent_type = "reseller", pricing_plan = "reseller_set"
+  - Creates pending document records
+
+SALESPERSON MANAGEMENT ACTIONS:
+  createSalesperson(formData)          — Only resellers can call
+  updateSalesperson(id, formData)      — Verifies salesperson.reseller_id === session.user_id
+  toggleSalespersonActive(id, bool)    — Activate/deactivate
+  setDealOverride(spId, clientId, rate) — Set per-client rate override
+
+
+================================================================================
+10. SALESPERSON DASHBOARD (/dashboard)
+================================================================================
+
+SALESPERSON SIDEBAR NAVIGATION:
+  Clients          /dashboard              Users icon
+  Invoices         /dashboard/invoices     FileText icon
+  [Settings gear]  /dashboard/portal       Settings icon (footer)
+
+DASHBOARD HOME (/dashboard):
+  - Shows ONLY clients where salesperson_id = session.user_id
+  - Same client list UI as reseller
+
+SALESPERSON PORTAL (/dashboard/portal):
+  - Route guard: session.user_type !== "salesperson" → redirect /dashboard
+  - Shows salesperson's info and pricing details
+
+PRICING PAGE (/dashboard/portal/pricing):
+  - Shows the salesperson's assigned pricing_plan
+  - Displays base_rate_google and display_price_google
+  - Action to set client pricing (within plan constraints)
+
+
+================================================================================
+11. CLIENT MANAGEMENT
+================================================================================
+
+CREATE CLIENT:
+  Route: /dashboard/clients/new
+  Action: createClient(formData)
+
+  Required fields: business_name, owner_name, address, google_url
+  Optional fields: business_phone, owner_phone, owner_email
+
+  RESELLER_ID ASSIGNMENT:
+    - If session.user_type === "reseller" → reseller_id = session.user_id
+    - If session.user_type === "salesperson" → reseller_id = session.parent_reseller_id
+    - If session.user_type === "owner" → reseller_id = session.user_id (fallback)
+
+  SALESPERSON_ID ASSIGNMENT:
+    - If session.user_type === "salesperson" → salesperson_id = session.user_id
+    - Otherwise → null
+
+  Initial status: "pending"
+
+CLIENT DETAIL PAGE (/dashboard/clients/[id]):
+  Access control (canAccessClient):
+    - owner → access ALL clients
+    - reseller → access if client.reseller_id === session.user_id
+    - salesperson → access if client.salesperson_id === session.user_id
+
+  Data displayed:
+    - Client info (name, email, phone, address)
+    - Google URL (clickable)
+    - Review stats (average rating, total count, star distribution)
+    - Full review list sorted worst-first
+    - Review status badges
+    - Contract generation UI (select reviews → generate PDF)
+    - Scrape button to refresh reviews
+
+UPDATE CLIENT:
+  Action: updateClient(id, formData)
+  - Verifies access via verifyClientAccess(session, id)
+  - Can update: business_name, owner_name, address, phones, email, google_url
+
+
+================================================================================
+12. REVIEW SCRAPING SYSTEM
+================================================================================
+
+MANUAL SCRAPE:
+  Endpoint: POST /api/scrape
+  Auth: owner OR reseller of client OR salesperson of client
+  Body: { client_id: "uuid" }
+
+  Process:
+    1. Fetch client from DB, get google_url
+    2. Delete ALL existing reviews for this client
+    3. Call Outscraper API:
+         GET https://api.app.outscraper.com/maps/reviews-v3
+         ?query={google_url}&reviews_limit=100&language=en
+         Header: X-API-KEY: $OUTSCRAPER_API_KEY
+    4. Map Outscraper fields:
+         author_title    → reviewer_name
+         review_rating   → star_rating
+         review_text     → review_text
+         review_datetime_utc → review_date
+    5. Insert all reviews with status = "active"
+    6. Create snapshot record (average_rating, total_reviews, total_stars)
+    7. Update client status to "active"
+
+  Cost: $3 per 1,000 reviews (500 free/month)
+
+AUTO SCRAPE (CRON):
+  Endpoint: GET /api/cron/scrape
+  Auth: Bearer $CRON_SECRET header
+  Schedule: 3x daily (configured externally)
+
+  Process:
+    1. Find all reviews with status = "in_progress"
+    2. Group by client_id
+    3. For each client:
+       a. Re-scrape Google URL
+       b. Compare scraped reviews against DB (case-insensitive name match)
+       c. For each review in DB that's NO LONGER in scraped results:
+          → Review has been removed!
+          → Trigger removal workflow (see section 13)
+
+
+REVIEW STATUS LIFECYCLE:
+  active            → Review exists, scraped from Google
+  in_progress       → Selected for removal, actively being worked on
+  removed           → Confirmed removed from Google (detected by cron)
+  waiting_for_payment → Invoice generated, awaiting client payment
+  paid              → Client paid the invoice
+  failed            → Removal attempt failed
+
+
+================================================================================
+13. CONTRACT GENERATION
+================================================================================
+
+Endpoint: POST /api/contracts/generate
+Auth: owner OR reseller of client OR salesperson of client
+
+Request body:
+  {
+    client_id:            "uuid"
+    selected_review_ids:  ["uuid", "uuid", ...]
+    contract_rate_google: number (price per removal)
+  }
+
+Process:
+  1. Fetch client and selected reviews from DB
+  2. Generate PDF using pdf-lib:
+
+     PDF STRUCTURE (Letter size 612x792):
+       Title: "REVIEW REMOVAL AND MANAGEMENT SERVICES AGREEMENT"
+       Section 1: Scope of Work (lists selected reviews)
+       Section 2: Fees and Payment ($X per removal, 24h due)
+       Section 3: Compliance with platform policies
+       Section 4: Termination clause
+       Section 5: Client representations (reviews are inaccurate)
+       Section 6: Retainer option ($1,000/month minimum)
+       Section 7: Entire agreement
+       Section 8: Notice (BTS address: 100 N Broadway Suite 2000, St. Louis MO)
+       Section 9: Governing law (Missouri)
+       Section 10: Dispute resolution (binding arbitration, St. Louis)
+       Signature block: Client + BTS Authority
+
+  3. Insert contract record:
+     {
+       client_id, reseller_id, salesperson_id,
+       selected_review_ids, google_review_count,
+       contract_rate_google, bts_base_google: 850,
+       status: "draft", generated_at: now
+     }
+
+  4. Return PDF as binary response with X-Contract-Id header
+
+EMAIL CONTRACT:
+  Endpoint: POST /api/email
+  Body: { client_id, pdf_base64, filename }
+  - Sends to client.owner_email
+  - CC: reseller's email
+  - From: "Review Redact <contracts@reviewredact.com>"
+  - Subject: "Contract — {business_name}"
+  - PDF attached
+
+
+================================================================================
+14. INVOICING SYSTEM
+================================================================================
+
+INVOICE CREATION (triggered by cron when review removal detected):
+
+  Invoice record:
+    {
+      id:                  UUID
+      contract_id:         linked contract
+      client_id:           linked client
+      reseller_id:         nullable
+      salesperson_id:      nullable
+      review_ids:          array of removed review UUIDs
+      total_amount:        client rate from contract
+      bts_base_amount:     BTS's cut
+      reseller_amount:     reseller's cut
+      salesperson_amount:  salesperson's cut
+      status:              "draft"
+      payment_token:       UUID (for /pay/[token] URL)
+      sent_at:             when email sent
+      due_at:              created_at + 24 hours
+      paid_at:             when payment confirmed
+      payment_method:      "credit_card" | "ach" | null
+      payment_reference:   processor reference
+    }
+
+INVOICE STATUS LIFECYCLE:
+  draft     → Created but not sent
+  sent      → Email sent to client with payment link
+  paid      → Payment confirmed
+  overdue   → Past due_at without payment
+  cancelled → Manually cancelled
+
+INVOICE PDF:
+  Generated by: generateInvoicePDF() in src/lib/invoice.ts
+  Header: Business Threat Solutions, LLC address
+  Content: Invoice #, date, due date, bill-to, line items, split details
+  Footer: Payment link, "PAYMENT DUE WITHIN 24 HOURS"
+
+
+================================================================================
+15. PAYMENT PROCESSING
+================================================================================
+
+PUBLIC PAYMENT PAGE:
+  Route: /pay/[token] (no auth required, token-gated)
+
+  Process:
+    1. Look up invoice by payment_token
+    2. If not found → error page
+    3. If status === "paid" → "Payment Complete" screen
+    4. If past due_at → show OVERDUE badge
+    5. Display: invoice amount, client name, due date
+    6. PaymentForm component for card/ACH entry
+
+PAYMENT METHODS:
+
+  VALOR PAY (Credit Card):
+    File: src/lib/payments/valor.ts
+    - Uses Valor Pay API
+    - Requires: VALOR_PAY_API_KEY, VALOR_PAY_MERCHANT_ID
+    - Processes credit card payments
+    - Returns processor reference on success
+
+  ACH (Bank Transfer):
+    File: src/lib/payments/ach.ts
+    - Direct bank transfer processing
+    - Requires routing + account numbers
+
+PAYMENT FLOW:
+  1. Client enters payment details on /pay/[token]
+  2. Payment submitted to processor
+  3. On success:
+     a. Update invoice status → "paid", paid_at = now
+     b. Update review status → "paid"
+     c. Create payment record in payments table
+     d. Create payout records for reseller/salesperson
+     e. Trigger "payment_received" notification
+  4. On failure:
+     a. Show error to client
+     b. Payment status → "failed"
+
+PAYOUT RECORDS:
+  {
+    id:             UUID
+    invoice_id:     linked invoice
+    payment_id:     linked payment
+    recipient_type: "reseller" | "salesperson"
+    recipient_id:   UUID
+    amount:         their share
+    status:         "pending" | "paid" | "held"
+    paid_at:        when actually paid out
+    notes:          optional
+  }
+
+
+================================================================================
+16. COMMISSION SPLITS & MONEY FLOW
+================================================================================
+
+File: src/lib/commissions.ts
+Function: calculateSplits(params) → { bts, reseller, salesperson }
+
+FOUR SCENARIOS:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SCENARIO 1: RESELLER DIRECT (no salesperson)
+  Client pays: $X (set by reseller)
+  BTS gets:    $850 (BTS_BASE_RATE)
+  Reseller:    $X - $850
+
+  Example: Client pays $1,500
+    BTS:      $850
+    Reseller: $650
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SCENARIO 2: RESELLER → SALESPERSON
+  Client pays: $X (set by salesperson, min $1,000)
+  BTS gets:    $850
+  Reseller:    effective_sp_rate - $850
+  Salesperson: $X - effective_sp_rate
+
+  effective_sp_rate = max($1,000, salesperson.base_rate_google)
+
+  Example: Client pays $1,800, SP base rate $1,100
+    BTS:          $850
+    Reseller:     $1,100 - $850 = $250
+    Salesperson:  $1,800 - $1,100 = $700
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SCENARIO 3: OWNER-DIRECT PLAN A ($750 flat, max $1K total)
+  Client pays: $X (max $1,000)
+  Salesperson: $750 (fixed, OWNER_DIRECT_PLAN_A_BASE)
+  BTS gets:    $X - $750 (max $250 spread)
+
+  Example: Client pays $1,000
+    Salesperson: $750
+    BTS:         $250
+
+  Example: Client pays $900
+    Salesperson: $750
+    BTS:         $150
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SCENARIO 4: OWNER-DIRECT PLAN B ($1K base to BTS, keep above)
+  Client pays: $X (must be >= $1,000)
+  BTS gets:    $1,000 (fixed, OWNER_DIRECT_PLAN_B_BASE)
+  Salesperson: $X - $1,000
+
+  Example: Client pays $2,000
+    BTS:         $1,000
+    Salesperson: $1,000
+
+  Example: Client pays $1,500
+    BTS:         $1,000
+    Salesperson: $500
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+================================================================================
+17. NOTIFICATIONS & EMAIL
+================================================================================
+
+File: src/lib/notifications.ts
+Email service: Resend API (RESEND_API_KEY)
+
+FROM ADDRESSES:
+  notifications@reviewredact.com  — removals, payment alerts
+  invoices@reviewredact.com       — invoices, payment reminders
+  contracts@reviewredact.com      — contract delivery
+
+EVENT TYPES:
+
+  review_removed:
+    - Email congrats to reseller + salesperson
+    - Store notification in DB
+    - Subject: "Review Removed — {businessName}"
+
+  invoice_sent:
+    - Email invoice to client (with PDF attachment)
+    - Email copy to ALL owner emails
+    - Subject: "Invoice — {businessName} — Review Removal"
+    - Owner copy subject: "[Invoice Sent] {businessName} — ${amount}"
+
+  payment_received:
+    - Email notification to reseller + salesperson
+    - Store notification in DB
+    - Subject: "Payment Received — {businessName}"
+
+  payment_overdue:
+    - Email reminder to client (gentle tone, payment link)
+    - Email ALERT to ALL owner emails (red header)
+    - Subject (client): "Friendly Reminder — Payment Due"
+    - Subject (owners): "[OVERDUE] {businessName} — ${amount} past due"
+
+  document_signed:
+    - Email to ALL owner emails
+    - Subject: "{signerName} signed {documentType}"
+
+OWNER EMAILS (always notified):
+  - abstoverkm@aol.com          (Blair Stover)
+  - vkawana@krusemennillo.com   (Victor Kawana)
+  - ian@cyberactiveconsulting.com (Ian Rakow)
+
+
+================================================================================
+18. CRON JOBS (AUTOMATED TASKS)
+================================================================================
+
+All cron endpoints require: Authorization: Bearer $CRON_SECRET
+
+─────────────────────────────────────────────────────────────────────────────
+CRON 1: AUTO-SCRAPE REVIEWS
+  Endpoint: GET /api/cron/scrape
+  Schedule: 3x daily (SCRAPE_TIMES_PER_DAY = 3)
+
+  1. Find all reviews with status = "in_progress"
+  2. Group by client
+  3. For each client: re-scrape Google, detect removals
+  4. For each removed review:
+     a. Update status → "removed"
+     b. Calculate commission splits
+     c. Create invoice
+     d. Generate invoice PDF
+     e. Send removal notification (email to reseller/SP)
+     f. Send invoice to client
+     g. Update review status → "waiting_for_payment"
+
+─────────────────────────────────────────────────────────────────────────────
+CRON 2: LATE PAYMENT DETECTION
+  Endpoint: GET /api/cron/late-payments
+  Schedule: Daily
+
+  1. Find invoices where status = "sent" AND due_at < now
+  2. Update status → "overdue"
+  3. For each overdue invoice:
+     a. Send reminder email to client
+     b. Send alert email to owners
+     c. Store overdue notification
+
+
+================================================================================
+19. RATE OVERRIDES
+================================================================================
+
+Table: rate_overrides
+Purpose: Allow owners or resellers to set custom rates for specific people/deals
+
+Fields:
+  id:          UUID
+  set_by_type: "owner" | "reseller"
+  set_by_id:   UUID (who set the override)
+  target_type: "reseller" | "salesperson"
+  target_id:   UUID (who it applies to)
+  client_id:   UUID | null (null = universal, applies to all their clients)
+  rate_google: number (the overridden rate)
+  notes:       string | null
+  created_at:  timestamp
+
+Example: Reseller Alex sets salesperson Mike's universal rate to $950
+  set_by_type: "reseller"
+  set_by_id:   alex.id
+  target_type: "salesperson"
+  target_id:   mike.id
+  client_id:   null (universal)
+  rate_google: 950
+  notes:       "Volume deal — Mike gets lower base on all clients"
+
+
+================================================================================
+20. DATABASE SCHEMA (ALL TABLES)
+================================================================================
+
+TABLE: resellers
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  name             TEXT NOT NULL
+  email            TEXT NOT NULL
+  cell             TEXT NOT NULL
+  pin_code         TEXT NOT NULL
+  company          TEXT
+  address          TEXT
+  tax_id_1099      TEXT
+  base_rate_google NUMERIC NOT NULL DEFAULT 850
+  base_rate_facebook NUMERIC NOT NULL DEFAULT 500
+  role             TEXT NOT NULL DEFAULT 'reseller'   -- "owner" or "reseller"
+  is_active        BOOLEAN NOT NULL DEFAULT true
+  created_at       TIMESTAMPTZ DEFAULT now()
+  updated_at       TIMESTAMPTZ DEFAULT now()
+
+TABLE: salespeople
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  reseller_id          UUID REFERENCES resellers(id)  -- null for owner-direct
+  name                 TEXT NOT NULL
+  email                TEXT NOT NULL
+  cell                 TEXT NOT NULL
+  pin_code             TEXT NOT NULL
+  company              TEXT
+  address              TEXT
+  tax_id_1099          TEXT
+  parent_type          TEXT NOT NULL                   -- "reseller" or "owner"
+  pricing_plan         TEXT                            -- "reseller_set", "owner_plan_a", "owner_plan_b"
+  base_rate_google     NUMERIC NOT NULL DEFAULT 1000
+  display_price_google NUMERIC
+  is_active            BOOLEAN NOT NULL DEFAULT true
+  created_at           TIMESTAMPTZ DEFAULT now()
+  updated_at           TIMESTAMPTZ DEFAULT now()
+
+TABLE: clients
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  reseller_id     UUID NOT NULL REFERENCES resellers(id)
+  salesperson_id  UUID REFERENCES salespeople(id)
+  business_name   TEXT NOT NULL
+  owner_name      TEXT NOT NULL
+  address         TEXT NOT NULL
+  business_phone  TEXT
+  owner_phone     TEXT
+  owner_email     TEXT
+  google_url      TEXT NOT NULL
+  status          TEXT NOT NULL DEFAULT 'pending'
+  notes           TEXT
+  created_at      TIMESTAMPTZ DEFAULT now()
+  updated_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: reviews
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  client_id      UUID NOT NULL REFERENCES clients(id)
+  platform       TEXT NOT NULL DEFAULT 'google'    -- "google" or "facebook"
+  reviewer_name  TEXT NOT NULL
+  star_rating    INTEGER NOT NULL
+  review_text    TEXT
+  review_date    DATE
+  status         TEXT NOT NULL DEFAULT 'active'
+  removal_date   DATE
+  created_at     TIMESTAMPTZ DEFAULT now()
+
+TABLE: snapshots
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  client_id       UUID NOT NULL REFERENCES clients(id)
+  average_rating  NUMERIC
+  total_reviews   INTEGER
+  total_stars     INTEGER
+  platform        TEXT NOT NULL DEFAULT 'google'
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: contracts
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  client_id            UUID NOT NULL REFERENCES clients(id)
+  reseller_id          UUID NOT NULL REFERENCES resellers(id)
+  salesperson_id       UUID REFERENCES salespeople(id)
+  selected_review_ids  UUID[] NOT NULL
+  google_review_count  INTEGER NOT NULL
+  contract_rate_google NUMERIC
+  bts_base_google      NUMERIC
+  status               TEXT NOT NULL DEFAULT 'draft'
+  generated_at         TIMESTAMPTZ NOT NULL
+  signed_at            TIMESTAMPTZ
+  pdf_path             TEXT
+
+TABLE: documents
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  signer_type     TEXT NOT NULL                -- "reseller" or "salesperson"
+  signer_id       UUID NOT NULL
+  document_type   TEXT NOT NULL                -- "w9_1099" or "contractor_agreement"
+  status          TEXT NOT NULL DEFAULT 'pending'
+  signature_data  JSONB                        -- { type, image_data/typed_name, font, ip, user_agent, timestamp }
+  signed_at       TIMESTAMPTZ
+  pdf_path        TEXT
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: invoices
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  contract_id       UUID NOT NULL REFERENCES contracts(id)
+  client_id         UUID NOT NULL REFERENCES clients(id)
+  reseller_id       UUID REFERENCES resellers(id)
+  salesperson_id    UUID REFERENCES salespeople(id)
+  review_ids        UUID[] NOT NULL
+  total_amount      NUMERIC NOT NULL
+  bts_base_amount   NUMERIC NOT NULL
+  reseller_amount   NUMERIC NOT NULL DEFAULT 0
+  salesperson_amount NUMERIC NOT NULL DEFAULT 0
+  status            TEXT NOT NULL DEFAULT 'draft'
+  payment_token     UUID
+  sent_at           TIMESTAMPTZ
+  due_at            TIMESTAMPTZ
+  paid_at           TIMESTAMPTZ
+  payment_method    TEXT                       -- "credit_card" or "ach"
+  payment_reference TEXT
+  created_at        TIMESTAMPTZ DEFAULT now()
+  updated_at        TIMESTAMPTZ DEFAULT now()
+
+TABLE: payments
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  invoice_id      UUID NOT NULL REFERENCES invoices(id)
+  amount          NUMERIC NOT NULL
+  method          TEXT NOT NULL                -- "credit_card" or "ach"
+  processor_ref   TEXT
+  status          TEXT NOT NULL DEFAULT 'pending'
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: payouts
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  invoice_id      UUID NOT NULL REFERENCES invoices(id)
+  payment_id      UUID NOT NULL REFERENCES payments(id)
+  recipient_type  TEXT NOT NULL                -- "reseller" or "salesperson"
+  recipient_id    UUID NOT NULL
+  amount          NUMERIC NOT NULL
+  status          TEXT NOT NULL DEFAULT 'pending'
+  paid_at         TIMESTAMPTZ
+  notes           TEXT
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: rate_overrides
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  set_by_type     TEXT NOT NULL                -- "owner" or "reseller"
+  set_by_id       UUID NOT NULL
+  target_type     TEXT NOT NULL                -- "reseller" or "salesperson"
+  target_id       UUID NOT NULL
+  client_id       UUID                         -- null = universal
+  rate_google     NUMERIC NOT NULL
+  notes           TEXT
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: notifications
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  recipient_type  TEXT NOT NULL                -- "owner", "reseller", "salesperson", "client"
+  recipient_id    UUID NOT NULL
+  event_type      TEXT NOT NULL
+  subject         TEXT NOT NULL
+  body            TEXT NOT NULL
+  email_sent      BOOLEAN NOT NULL DEFAULT false
+  email_sent_at   TIMESTAMPTZ
+  read            BOOLEAN NOT NULL DEFAULT false
+  metadata        JSONB
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+
+================================================================================
+21. PRICING CONSTANTS
+================================================================================
+
+  BTS_BASE_RATE                   = $850    Google removal base
+  BTS_BASE_RATE_FACEBOOK          = $500    Facebook removal base
+  RESELLER_SALESPERSON_MIN_RATE   = $1,000  Min rate for reseller's salespeople
+  OWNER_DIRECT_PLAN_A_BASE        = $750    Plan A: SP gets $750 flat
+  OWNER_DIRECT_PLAN_A_MAX         = $1,000  Plan A: max client charge
+  OWNER_DIRECT_PLAN_B_BASE        = $1,000  Plan B: BTS takes $1K, SP keeps rest
+  MAX_VOLUME_DISCOUNT             = 15%     For 100+ active accounts
+  VOLUME_DISCOUNT_THRESHOLD       = 100     Active account minimum for discount
+  RETAINER_MINIMUM_MONTHLY        = $1,000  Monthly retainer minimum
+  INVOICE_DUE_HOURS               = 24      Hours until payment due
+  SCRAPE_TIMES_PER_DAY            = 3       Auto-scrape frequency
+  SUCCESS_RATE                    = 98%     Review removal success rate
+
+
+================================================================================
+22. ENVIRONMENT VARIABLES
+================================================================================
+
+  NEXT_PUBLIC_SUPABASE_URL       Supabase project URL
+  NEXT_PUBLIC_SUPABASE_ANON_KEY  Supabase anon key (unused — service role used)
+  SUPABASE_SERVICE_ROLE_KEY      Service role key (bypasses RLS)
+  SESSION_SECRET                 Secret for HS256 JWT signing
+  RESEND_API_KEY                 Resend email API key
+  OUTSCRAPER_API_KEY             Outscraper review scraping API key
+  CRON_SECRET                    Bearer token for cron job authorization
+  VALOR_PAY_API_KEY              Valor Pay payment processor key
+  VALOR_PAY_MERCHANT_ID          Valor Pay merchant ID
+  NODE_ENV                       "development" or "production"
+
+
+================================================================================
+23. API ENDPOINT REFERENCE
+================================================================================
+
+  METHOD  ROUTE                      AUTH              PURPOSE
+  ──────  ─────                      ────              ───────
+  POST    /api/auth/login            None              PIN-based login
+  POST    /api/auth/logout           Session           Clear session cookie
+  POST    /api/scrape                Session (role)    Manual review scrape
+  GET     /api/cron/scrape           CRON_SECRET       Auto-detect removals
+  GET     /api/cron/late-payments    CRON_SECRET       Detect overdue invoices
+  POST    /api/contracts/generate    Session (role)    Generate contract PDF
+  POST    /api/email                 Session (role)    Email contract to client
+
+  PAGE ROUTES:
+  /                                  Public            3D Vault + Login
+  /sign                              Session           Document signing
+  /owner                             Owner only        Owner dashboard
+  /owner/resellers                   Owner only        Manage resellers
+  /owner/salespeople                 Owner only        Manage all salespeople
+  /owner/salespeople/new             Owner only        Add owner-direct SP
+  /owner/clients                     Owner only        View all clients
+  /owner/invoices                    Owner only        View all invoices
+  /owner/payments                    Owner only        View all payments
+  /owner/documents                   Owner only        View all signed docs
+  /owner/reports                     Owner only        Revenue reports
+  /owner/overrides                   Owner only        Rate overrides
+  /dashboard                         Reseller/SP       Client list
+  /dashboard/clients/new             Reseller/SP       Add client
+  /dashboard/clients/[id]            Role-scoped       Client detail + reviews
+  /dashboard/settings                Reseller only     Manage salespeople
+  /dashboard/settings/salespeople/new Reseller only    Add salesperson
+  /dashboard/invoices                Reseller/SP       View invoices
+  /dashboard/portal                  Salesperson only  SP settings
+  /dashboard/portal/pricing          Salesperson only  Pricing details
+  /pay/[token]                       Public (token)    Client payment page
+
+
+================================================================================
+24. DECISION TREES
+================================================================================
+
+COMPLETE USER JOURNEY — OWNER:
+  Visit / → proxy redirects to /owner → Owner Dashboard
+  Can navigate to any /owner/* page
+  Can view all resellers, salespeople, clients, invoices, payments
+  Can add owner-direct salespeople
+  Can set rate overrides
+  Receives email copies of all invoices and overdue alerts
+
+COMPLETE USER JOURNEY — RESELLER (first time):
+  Visit / → Login with name + PIN → API returns documents_signed: false
+  → LoginPanel routes to /sign → Sign W-9/1099 → Sign contractor agreement
+  → Session refreshed with documents_signed: true → Redirect to /dashboard
+  → See client list (empty initially) → Add Client → Enter business info + Google URL
+  → Scrape reviews → Select bad reviews → Generate contract → Email to client
+  → Client signs contract → Reviews set to "in_progress"
+  → Cron detects removal → Invoice auto-generated → Client pays via /pay/[token]
+  → Reseller receives their commission share
+
+COMPLETE USER JOURNEY — RESELLER (returning):
+  Visit / → proxy sees valid session → redirects to /dashboard
+  → Manage clients, view invoices, manage salespeople via settings
+
+COMPLETE USER JOURNEY — SALESPERSON (first time):
+  Visit / → Login → documents_signed: false → /sign
+  → Sign both documents → /dashboard
+  → See only their assigned clients
+  → Same client workflow as reseller but scoped to their clients
+
+COMPLETE USER JOURNEY — CLIENT (payment):
+  Receives invoice email with payment link
+  → Clicks /pay/[token] → Sees invoice amount + due date
+  → Enters credit card or ACH details → Payment processed
+  → Invoice marked paid → Everyone notified
+
+REVIEW REMOVAL LIFECYCLE:
+  Scrape → active → Select for contract → in_progress
+  → Cron detects removal → removed → Invoice created → waiting_for_payment
+  → Client pays → paid
+  (or)
+  → Removal fails → failed
+
+MONEY FLOW:
+  Client pays invoice amount ($X)
+       │
+       ├── BTS receives: base rate ($850 Google / $500 Facebook)
+       │
+       ├── Reseller receives: their margin (varies by scenario)
+       │
+       └── Salesperson receives: their margin (varies by pricing plan)
+       │
+       └── Payout records created, status = "pending" until manually paid
+
+
+================================================================================
+END OF SPECIFICATION
+================================================================================

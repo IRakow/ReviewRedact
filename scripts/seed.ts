@@ -74,6 +74,8 @@ const resellers = [
     base_rate_facebook: 500,
     role: "reseller" as const,
     is_active: true,
+    commission_plan_type: "fixed" as const,
+    commission_plan_config: {},
   },
   {
     name: "Sarah Chen",
@@ -87,6 +89,8 @@ const resellers = [
     base_rate_facebook: 500,
     role: "reseller" as const,
     is_active: true,
+    commission_plan_type: "base_split" as const,
+    commission_plan_config: { split_sp_pct: 60 },
   },
 ]
 
@@ -287,7 +291,7 @@ async function seed() {
 
   // Clear existing data in dependency order
   console.log("Clearing existing data...")
-  const tables = ["payouts", "payments", "invoices", "notifications", "rate_overrides", "documents", "contracts", "snapshots", "reviews", "clients", "salespeople", "resellers"]
+  const tables = ["prospects", "payouts", "payments", "invoices", "notifications", "rate_overrides", "documents", "contracts", "snapshots", "reviews", "clients", "salespeople", "resellers"]
   for (const table of tables) {
     const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000")
     if (error) {

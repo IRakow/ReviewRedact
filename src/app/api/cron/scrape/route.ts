@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { scrapeGoogleReviews } from "@/lib/scraper"
-import { calculateSplits } from "@/lib/commissions"
+import { calculateSplits, resolveCommissionPlan } from "@/lib/commissions"
 import { generateInvoicePDF } from "@/lib/invoice"
 import { notify } from "@/lib/notifications"
 import { INVOICE_DUE_HOURS } from "@/lib/constants"
@@ -89,21 +89,26 @@ export async function GET() {
         let resellerData: { id: string; baseRate: number; email: string; name: string } | undefined
         let salespersonData: { id: string; parentType: string; pricingPlan: string | null; baseRate: number; email: string; name: string } | undefined
 
+        let resellerPlan: { type: string; config: Record<string, unknown> } | undefined
+
         if (contract.reseller_id) {
           const { data: reseller } = await supabase
             .from("resellers")
-            .select("id, base_rate_google, email, name")
+            .select("id, base_rate_google, email, name, commission_plan_type, commission_plan_config")
             .eq("id", contract.reseller_id)
             .single()
           if (reseller) {
             resellerData = { id: reseller.id, baseRate: reseller.base_rate_google, email: reseller.email, name: reseller.name }
+            resellerPlan = { type: reseller.commission_plan_type, config: reseller.commission_plan_config as Record<string, unknown> }
           }
         }
+
+        let spPlan: { type: string; config: Record<string, unknown> } | undefined
 
         if (contract.salesperson_id) {
           const { data: sp } = await supabase
             .from("salespeople")
-            .select("id, parent_type, pricing_plan, base_rate_google, email, name")
+            .select("id, parent_type, pricing_plan, base_rate_google, email, name, commission_plan_type, commission_plan_config")
             .eq("id", contract.salesperson_id)
             .single()
           if (sp) {
@@ -115,19 +120,31 @@ export async function GET() {
               email: sp.email,
               name: sp.name,
             }
+            if (sp.commission_plan_type) {
+              spPlan = { type: sp.commission_plan_type, config: sp.commission_plan_config as Record<string, unknown> }
+            }
           }
         }
+
+        // Resolve effective commission plan (SP override → reseller global → fixed)
+        const commissionPlan = salespersonData?.parentType === "reseller"
+          ? resolveCommissionPlan(
+              resellerPlan ? { type: resellerPlan.type as "fixed" | "base_split" | "percentage" | "flat_fee", config: resellerPlan.config } : undefined,
+              spPlan ? { type: spPlan.type as "fixed" | "base_split" | "percentage" | "flat_fee", config: spPlan.config } : undefined,
+            )
+          : undefined
 
         // Calculate splits
         const splits = calculateSplits({
           clientRate,
-          reseller: resellerData ? { id: resellerData.id, baseRate: resellerData.baseRate } : undefined,
+          platform: "google",
           salesperson: salespersonData ? {
-            id: salespersonData.id,
+            exists: true,
             parentType: salespersonData.parentType as "reseller" | "owner",
             pricingPlan: salespersonData.pricingPlan as "reseller_set" | "owner_plan_a" | "owner_plan_b" | null,
-            baseRate: salespersonData.baseRate,
+            baseRateGoogle: salespersonData.baseRate,
           } : undefined,
+          commissionPlan,
         })
 
         // Generate payment token

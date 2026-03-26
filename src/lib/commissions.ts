@@ -1,114 +1,172 @@
 import {
   BTS_BASE_RATE,
+  BTS_BASE_RATE_FACEBOOK,
   OWNER_DIRECT_PLAN_A_BASE,
   OWNER_DIRECT_PLAN_A_MAX,
   OWNER_DIRECT_PLAN_B_BASE,
 } from "./constants"
-import type { CommissionSplit, PricingPlan } from "./types"
+import type {
+  CommissionPlanConfig,
+  CommissionPlanType,
+  CommissionSplit,
+  PricingPlan,
+  Reseller,
+  Salesperson,
+} from "./types"
+
+// ─── Resolve Commission Plan ────────────────────────────────────────────────
+
+/**
+ * Determine the effective commission plan for a deal.
+ * Priority: salesperson override → reseller global → default "fixed".
+ */
+export function resolveCommissionPlan(
+  reseller: Pick<Reseller, "commission_plan_type" | "commission_plan_config">,
+  salesperson?: Pick<Salesperson, "commission_plan_type" | "commission_plan_config"> | null,
+): { type: CommissionPlanType; config: CommissionPlanConfig } {
+  // SP-level override takes priority
+  if (salesperson?.commission_plan_type) {
+    return {
+      type: salesperson.commission_plan_type,
+      config: salesperson.commission_plan_config ?? {},
+    }
+  }
+
+  // Reseller global plan
+  return {
+    type: reseller.commission_plan_type ?? "fixed",
+    config: reseller.commission_plan_config ?? {},
+  }
+}
+
+// ─── Calculate Splits ───────────────────────────────────────────────────────
 
 interface SplitParams {
   clientRate: number
-  reseller?: {
-    id: string
-    baseRate: number // what BTS charges this reseller (usually $850)
-  }
+  platform: "google" | "facebook"
+  resellerBaseRate?: number // defaults to BTS_BASE_RATE or BTS_BASE_RATE_FACEBOOK
   salesperson?: {
-    id: string
+    exists: boolean
     parentType: "reseller" | "owner"
-    pricingPlan: PricingPlan | null
-    baseRate: number // what the salesperson's base cost is
+    pricingPlan?: PricingPlan | null
+    baseRateGoogle: number
   }
-  rateOverride?: number // per-deal override rate for the salesperson
+  commissionPlan?: {
+    type: CommissionPlanType
+    config: CommissionPlanConfig
+  }
+  rateOverride?: number // per-client override for SP base rate
+}
+
+function clamp(value: number): number {
+  return Math.max(0, Math.round(value * 100) / 100)
 }
 
 /**
  * Calculate commission splits for a single review removal.
  *
  * Scenarios:
- * 1. Reseller direct sale (no salesperson): BTS $850, reseller keeps rest
- * 2. Reseller → Salesperson: BTS $850, salesperson gets their allocated rate, reseller keeps middle
- * 3. Owner-direct Plan A: Salesperson gets $750 flat, BTS keeps rest (max $1K charge)
- * 4. Owner-direct Plan B: BTS gets $1,000, salesperson keeps everything above
+ * 1. Reseller direct sale (no salesperson): BTS gets base, reseller keeps rest
+ * 2. Owner-direct Plan A: SP gets $750 flat, BTS keeps rest (max $1K charge)
+ * 3. Owner-direct Plan B: BTS gets $1,000, SP keeps everything above
+ * 4. Reseller → SP with commission plan (fixed / base_split / percentage / flat_fee)
  */
 export function calculateSplits(params: SplitParams): CommissionSplit {
-  const { clientRate, reseller, salesperson, rateOverride } = params
+  const { clientRate, platform, salesperson, commissionPlan, rateOverride } = params
 
-  // Scenario 3 & 4: Owner-direct salesperson (no reseller in chain)
-  if (salesperson && salesperson.parentType === "owner") {
+  const btsBase = platform === "google" ? BTS_BASE_RATE : BTS_BASE_RATE_FACEBOOK
+
+  // ── Owner-direct salesperson (no reseller in chain) ──────────────────────
+  if (salesperson?.exists && salesperson.parentType === "owner") {
     if (salesperson.pricingPlan === "owner_plan_a") {
-      // Plan A: Salesperson gets $750 flat, BTS keeps the rest
-      // Client can't be charged more than $1K
+      // Plan A: SP gets $750 flat, BTS keeps the rest (max client charge $1K)
       const effectiveRate = Math.min(clientRate, OWNER_DIRECT_PLAN_A_MAX)
       return {
-        bts: effectiveRate - OWNER_DIRECT_PLAN_A_BASE,
+        bts: clamp(effectiveRate - OWNER_DIRECT_PLAN_A_BASE),
         reseller: 0,
-        salesperson: OWNER_DIRECT_PLAN_A_BASE,
+        salesperson: clamp(OWNER_DIRECT_PLAN_A_BASE),
       }
     }
 
     if (salesperson.pricingPlan === "owner_plan_b") {
-      // Plan B: BTS gets $1,000, salesperson keeps everything above
+      // Plan B: BTS gets $1,000, SP keeps everything above
       return {
-        bts: Math.min(clientRate, OWNER_DIRECT_PLAN_B_BASE),
+        bts: clamp(Math.min(clientRate, OWNER_DIRECT_PLAN_B_BASE)),
         reseller: 0,
-        salesperson: Math.max(0, clientRate - OWNER_DIRECT_PLAN_B_BASE),
+        salesperson: clamp(clientRate - OWNER_DIRECT_PLAN_B_BASE),
       }
     }
 
     // Fallback: BTS keeps everything
-    return { bts: clientRate, reseller: 0, salesperson: 0 }
+    return { bts: clamp(clientRate), reseller: 0, salesperson: 0 }
   }
 
-  // Scenario 1: Reseller direct sale (no salesperson)
-  if (reseller && !salesperson) {
-    const btsAmount = Math.min(clientRate, reseller.baseRate || BTS_BASE_RATE)
+  // ── Reseller direct sale (no salesperson) ────────────────────────────────
+  if (!salesperson?.exists) {
     return {
-      bts: btsAmount,
-      reseller: Math.max(0, clientRate - btsAmount),
+      bts: clamp(btsBase),
+      reseller: clamp(clientRate - btsBase),
       salesperson: 0,
     }
   }
 
-  // Scenario 2: Reseller → Salesperson
-  if (reseller && salesperson) {
-    const btsAmount = reseller.baseRate || BTS_BASE_RATE
-    const effectiveSpRate = rateOverride ?? salesperson.baseRate
-    // Salesperson gets everything between BTS base and the rate the reseller set for them
-    // Actually: salesperson gets (clientRate - effectiveSpRate) if reseller set the SP rate as what client pays minus SP cut
-    // The reseller's salesperson base_rate is the FLOOR — reseller decides what SP gets per deal
-    // So: BTS gets $850, reseller gets (clientRate - $850 - spCut), SP gets spCut
-    // The sp baseRate is the minimum the reseller must give them. Override can change per-deal.
-    const spAmount = Math.max(0, clientRate - btsAmount - (clientRate - btsAmount - (effectiveSpRate - btsAmount)))
-    // Simpler: SP gets (effectiveSpRate - btsAmount) if that makes sense
-    // Actually the simplest interpretation:
-    // - Client pays $clientRate
-    // - BTS takes $850
-    // - Remainder = clientRate - 850
-    // - Of that remainder, salesperson gets (effectiveSpRate - BTS_BASE_RATE) or whatever reseller allocates
-    // Let's think differently:
-    // - The reseller's base is $850 to BTS
-    // - The salesperson's base_rate is what the RESELLER charges the SP (like BTS charges the reseller)
-    // - So if SP base_rate is $1000, BTS gets $850, reseller keeps $150, SP gets clientRate - $1000
-    // Wait, the user said: "the resellers base rate of $850... salespeople will work on the resellers team.
-    // the reseller will decide on a case by case basis what each salesperson of his makes"
-    // And "salesperson has the opportunity to get everything over $1k"
-    // So: client pays X. BTS gets $850. Reseller's salesperson's base is $1K.
-    // SP gets (X - $1K). Reseller gets ($1K - $850) = $150 from each SP deal.
-    // If override, SP base changes.
+  // ── Reseller → Salesperson ───────────────────────────────────────────────
+  const effectiveSpRate = rateOverride ?? salesperson.baseRateGoogle
+  const planType = commissionPlan?.type ?? "fixed"
+  const config = commissionPlan?.config ?? {}
 
-    const spCut = Math.max(0, clientRate - effectiveSpRate)
-    const resellerCut = Math.max(0, effectiveSpRate - btsAmount)
+  let spAmount: number
+  let resellerAmount: number
 
-    return {
-      bts: btsAmount,
-      reseller: resellerCut,
-      salesperson: spCut,
+  switch (planType) {
+    case "fixed": {
+      // SP gets everything above their effective rate; reseller gets middle
+      spAmount = clientRate - effectiveSpRate
+      resellerAmount = effectiveSpRate - btsBase
+      break
+    }
+
+    case "base_split": {
+      // Overage above SP rate is split between SP and reseller
+      const overage = clientRate - effectiveSpRate
+      const splitPct = config.split_sp_pct ?? 50
+      spAmount = overage * (splitPct / 100)
+      resellerAmount = (effectiveSpRate - btsBase) + overage * (1 - splitPct / 100)
+      break
+    }
+
+    case "percentage": {
+      // Total margin above BTS base is split by percentage
+      const margin = clientRate - btsBase
+      const spPct = config.sp_margin_pct ?? 50
+      spAmount = margin * (spPct / 100)
+      resellerAmount = margin * (1 - spPct / 100)
+      break
+    }
+
+    case "flat_fee": {
+      // SP gets a flat fee per deal
+      const flatFee = config.sp_flat_fee ?? 0
+      spAmount = flatFee
+      resellerAmount = clientRate - btsBase - flatFee
+      break
+    }
+
+    default: {
+      // Fallback to fixed
+      spAmount = clientRate - effectiveSpRate
+      resellerAmount = effectiveSpRate - btsBase
     }
   }
 
-  // Fallback: no reseller, no salesperson (shouldn't happen)
-  return { bts: clientRate, reseller: 0, salesperson: 0 }
+  return {
+    bts: clamp(btsBase),
+    reseller: clamp(resellerAmount),
+    salesperson: clamp(spAmount),
+  }
 }
+
+// ─── Validate Deal Rate ─────────────────────────────────────────────────────
 
 /**
  * Validate that a deal rate complies with the salesperson's pricing plan rules.
@@ -134,4 +192,36 @@ export function validateDealRate(params: {
   }
 
   return { valid: true }
+}
+
+// ─── Calculate Impact (Prospect Tool) ───────────────────────────────────────
+
+/**
+ * Calculate the rating impact of removing selected reviews.
+ */
+export function calculateImpact(
+  reviews: Array<{ id: string; star_rating: number }>,
+  selectedIds: string[],
+): { originalRating: number; projectedRating: number; change: number; removedCount: number } {
+  if (reviews.length === 0) {
+    return { originalRating: 0, projectedRating: 0, change: 0, removedCount: 0 }
+  }
+
+  const originalRating =
+    reviews.reduce((sum, r) => sum + r.star_rating, 0) / reviews.length
+
+  const selectedSet = new Set(selectedIds)
+  const remaining = reviews.filter((r) => !selectedSet.has(r.id))
+
+  const projectedRating =
+    remaining.length > 0
+      ? remaining.reduce((sum, r) => sum + r.star_rating, 0) / remaining.length
+      : 0
+
+  return {
+    originalRating: Math.round(originalRating * 100) / 100,
+    projectedRating: Math.round(projectedRating * 100) / 100,
+    change: Math.round((projectedRating - originalRating) * 100) / 100,
+    removedCount: selectedIds.length,
+  }
 }
