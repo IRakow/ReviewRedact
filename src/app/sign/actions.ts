@@ -3,6 +3,7 @@
 import { getSession, createSession, setSessionCookie } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { Resend } from "resend"
 import { OWNER_EMAILS } from "@/lib/constants"
 import type { DocumentType, SignatureData, Session } from "@/lib/types"
@@ -44,7 +45,8 @@ export async function signDocument(
     image_data?: string
     typed_name?: string
     font?: string
-  }
+  },
+  userAgent?: string
 ) {
   const session = await getSession()
   if (!session) return { error: "Not authenticated — please log in again" }
@@ -83,13 +85,20 @@ export async function signDocument(
       return { error: "Document already signed" }
     }
 
+    // Get real IP from request headers
+    const headersList = await headers()
+    const ip =
+      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      headersList.get("x-real-ip") ??
+      "unknown"
+
     const signatureData: SignatureData = {
       type: signaturePayload.type,
       image_data: signaturePayload.image_data,
       typed_name: signaturePayload.typed_name,
       font: signaturePayload.font,
-      ip: "server-side",
-      user_agent: "server-side",
+      ip,
+      user_agent: userAgent ?? "unknown",
       timestamp: new Date().toISOString(),
     }
 
