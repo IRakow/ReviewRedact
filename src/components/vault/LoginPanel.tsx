@@ -100,17 +100,17 @@ export function LoginPanel({
           >
             <form
               onSubmit={handleSubmit}
-              className="relative w-80 space-y-5 rounded-md border border-steel/20 bg-[#0a0a0a]/90 p-7 backdrop-blur-xl"
+              className="relative w-80 space-y-5 rounded-md border border-[#c9a96e]/20 bg-[#0d0906]/90 p-7 backdrop-blur-xl"
             >
               {/* Corner accents */}
-              <div className="absolute top-0 left-0 h-px w-16 bg-gradient-to-r from-steel/60 to-transparent" />
-              <div className="absolute top-0 left-0 h-16 w-px bg-gradient-to-b from-steel/60 to-transparent" />
-              <div className="absolute bottom-0 right-0 h-px w-16 bg-gradient-to-l from-steel/60 to-transparent" />
-              <div className="absolute bottom-0 right-0 h-16 w-px bg-gradient-to-t from-steel/60 to-transparent" />
+              <div className="absolute top-0 left-0 h-px w-16 bg-gradient-to-r from-[#c9a96e]/40 to-transparent" />
+              <div className="absolute top-0 left-0 h-16 w-px bg-gradient-to-b from-[#c9a96e]/40 to-transparent" />
+              <div className="absolute bottom-0 right-0 h-px w-16 bg-gradient-to-l from-[#c9a96e]/40 to-transparent" />
+              <div className="absolute bottom-0 right-0 h-16 w-px bg-gradient-to-t from-[#c9a96e]/40 to-transparent" />
 
               {/* Header */}
               <div className="text-center">
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-sm border border-steel/30 bg-steel/5 font-mono text-sm font-bold text-steel">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-sm border border-[#c9a96e]/30 bg-[#c9a96e]/5 font-mono text-sm font-bold text-[#c9a96e]">
                   RR
                 </div>
                 <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-muted-foreground">
@@ -128,7 +128,7 @@ export function LoginPanel({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30 transition-colors"
+                  className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-[#c9a96e]/50 focus:outline-none focus:ring-1 focus:ring-[#c9a96e]/30 transition-colors"
                   placeholder="Enter name"
                   required
                   autoComplete="off"
@@ -147,7 +147,7 @@ export function LoginPanel({
                     const val = e.target.value.replace(/\D/g, "").slice(0, 6)
                     setCode(val)
                   }}
-                  className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-lg tracking-[0.5em] text-center text-foreground placeholder:text-border placeholder:tracking-normal placeholder:text-sm focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30 transition-colors"
+                  className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-lg tracking-[0.5em] text-center text-foreground placeholder:text-border placeholder:tracking-normal placeholder:text-sm focus:border-[#c9a96e]/50 focus:outline-none focus:ring-1 focus:ring-[#c9a96e]/30 transition-colors"
                   placeholder="••••••"
                   maxLength={6}
                   inputMode="numeric"
@@ -174,11 +174,11 @@ export function LoginPanel({
               <button
                 type="submit"
                 disabled={loading || name.length === 0 || code.length !== 6}
-                className="w-full rounded-sm border border-steel/30 bg-steel/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-steel transition-all hover:bg-steel/20 hover:border-steel/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-full rounded-sm border border-[#c9a96e]/30 bg-[#c9a96e]/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#c9a96e] transition-all hover:bg-[#c9a96e]/20 hover:border-[#c9a96e]/50 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-steel/30 border-t-steel" />
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#c9a96e]/30 border-t-[#c9a96e]" />
                     Verifying
                   </span>
                 ) : (
@@ -191,7 +191,7 @@ export function LoginPanel({
                 <button
                   type="button"
                   onClick={() => { setShowReset(!showReset); setResetMessage(""); setResetName("") }}
-                  className="text-[10px] text-muted-foreground hover:text-steel transition-colors tracking-wide"
+                  className="text-[10px] text-muted-foreground hover:text-[#c9a96e] transition-colors tracking-wide"
                 >
                   Forgot your access code?
                 </button>
@@ -219,7 +219,7 @@ export function LoginPanel({
                       type="text"
                       value={resetName}
                       onChange={(e) => setResetName(e.target.value)}
-                      className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30 transition-colors"
+                      className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-[#c9a96e]/50 focus:outline-none focus:ring-1 focus:ring-[#c9a96e]/30 transition-colors"
                       placeholder="Enter your name"
                       required
                       autoComplete="off"
@@ -242,11 +242,11 @@ export function LoginPanel({
                   <button
                     type="submit"
                     disabled={resetLoading || resetName.trim().length === 0}
-                    className="w-full rounded-sm border border-steel/30 bg-steel/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-steel transition-all hover:bg-steel/20 hover:border-steel/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-full rounded-sm border border-[#c9a96e]/30 bg-[#c9a96e]/10 px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-[#c9a96e] transition-all hover:bg-[#c9a96e]/20 hover:border-[#c9a96e]/50 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     {resetLoading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-steel/30 border-t-steel" />
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#c9a96e]/30 border-t-[#c9a96e]" />
                         Sending
                       </span>
                     ) : (
