@@ -88,7 +88,7 @@ export function VaultRoom() {
             transition={{ duration: 1, delay: 1 }}
           >
             <div
-              className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-sm font-mono text-xl font-bold text-[#c9a96e]/70 tracking-wider"
+              className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-sm font-mono text-xl font-bold text-[#c9a96e]/80 tracking-wider"
               style={{
                 border: "1px solid rgba(201,169,110,0.2)",
                 background: "rgba(201,169,110,0.03)",
@@ -98,7 +98,7 @@ export function VaultRoom() {
             >
               RR
             </div>
-            <p className="text-[9px] font-medium uppercase tracking-[0.5em] text-[#c9a96e]/25">
+            <p className="text-[9px] font-medium uppercase tracking-[0.5em] text-[#c9a96e]/40">
               By Invitation Only
             </p>
           </motion.div>
