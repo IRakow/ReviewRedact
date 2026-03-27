@@ -15,10 +15,12 @@ import {
   LogOut,
   Sliders,
   History,
+  Zap,
 } from "lucide-react"
 
 const navItems = [
   { label: "Dashboard", href: "/owner", icon: LayoutDashboard },
+  { label: "Direct Sale", href: "/owner/direct-sale", icon: Zap },
   { label: "Resellers", href: "/owner/resellers", icon: Users },
   { label: "Salespeople", href: "/owner/salespeople", icon: UserCheck },
   { label: "Clients", href: "/owner/clients", icon: Building2 },
