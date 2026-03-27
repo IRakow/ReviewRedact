@@ -126,6 +126,11 @@ export interface Contract {
   generated_at: string
   signed_at: string | null
   pdf_path: string | null
+  signing_token: string
+  signature_data: SignatureData | null
+  signer_name: string | null
+  signer_ip: string | null
+  signed_pdf_path: string | null
 }
 
 // ─── Documents (1099 + Contractor Agreement) ─────────────────────────────────

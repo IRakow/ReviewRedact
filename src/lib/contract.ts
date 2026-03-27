@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
-import type { Client, Review } from "./types"
+import type { Client, Review, SignatureData } from "./types"
 
 const MARGIN_LEFT = 60
 const MARGIN_RIGHT = 60
@@ -345,6 +345,138 @@ export async function generateContractPDF(options: ContractOptions): Promise<Uin
     size: 9,
     font: helvetica,
     color: rgb(0.5, 0.5, 0.5),
+  })
+
+  return await pdfDoc.save()
+}
+
+// ─── Signed Contract PDF ──────────────────────────────────────────────────────
+
+interface SignedContractOptions extends ContractOptions {
+  signatureData: {
+    type: "draw" | "typed"
+    image_data?: string
+    typed_name?: string
+    font?: string
+  }
+  signerName: string
+  signedAt: string
+}
+
+export async function generateSignedContractPDF(options: SignedContractOptions): Promise<Uint8Array> {
+  const { signatureData, signerName, signedAt, ...contractOptions } = options
+
+  // 1. Generate the base PDF
+  const basePdfBytes = await generateContractPDF(contractOptions)
+
+  // 2. Load it with pdf-lib
+  const pdfDoc = await PDFDocument.load(basePdfBytes)
+  const pages = pdfDoc.getPages()
+  const lastPage = pages[pages.length - 1]
+  const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+
+  // The signature block on the last page: CLIENT section is drawn first,
+  // then BTS section. We need to find the CLIENT signature line.
+  // Based on the PDF generation, after "Signatures" header + witness paragraph + gap,
+  // CLIENT: is drawn, then a signature line. We target a known Y region.
+  // The signature lines are at roughly the same position each time.
+  // We'll scan for the signature line by looking at page content annotations,
+  // but since pdf-lib can't easily read drawn lines, we use a fixed offset approach.
+  //
+  // Strategy: The CLIENT signature area is approximately 180-220 points from the
+  // bottom of the last page. We draw the signature at a reasonable fixed position
+  // above the first signature line after "CLIENT:".
+  //
+  // Since the contract layout is deterministic (same sections each time),
+  // we place the signature image/text and date at known Y coordinates
+  // relative to the bottom of the page.
+
+  // CLIENT signature position — the signature line is drawn ~180pt from bottom
+  // on a typical 2-page contract. We'll use the page height and work from the
+  // content that was drawn.
+  //
+  // More reliable: re-derive from the contract structure.
+  // The last page has: CLIENT: + sig line + name + title + business + date line + gap + BTS: + sig line ...
+  // Each sig line is preceded by y-=10, then the line, then y-=14 for label, y-=20 gap
+  // So from the bottom of the BTS section going up:
+  //   BTS date line label: ~y=30 (page number) + 20 + 14 = ~64
+  //   BTS sig line: ~64 + 20 + 14 + 10 = ~108
+  //   BTS header: ~108 + 14*3 + 4 + 10 = ~174
+  //   CLIENT date label: ~174 + 20 = ~194
+  //   CLIENT date sig line: ~194 + 14 = ~208
+  //   CLIENT business line: ~208 + 14 = ~222
+  //   CLIENT title line: ~222 + 14 = ~236
+  //   CLIENT name line: ~236 + 14 = ~250
+  //   CLIENT sig label: ~250 + 14 = ~264
+  //   CLIENT sig line: ~264 + 10 = ~274
+  //
+  // We want to draw the signature just above the CLIENT signature line area.
+  // Let's use a relative approach: draw the signature ~275pt from the bottom,
+  // and the date ~195pt from the bottom.
+
+  // Actually, let's be smarter. We know the page content height and we know
+  // the last items drawn. Let's just target specific Y coordinates from the bottom.
+
+  const clientSigY = 270 // Y position for signature (above the sig line)
+  const clientDateY = 192 // Y position for date (above the date line)
+
+  if (signatureData.type === "draw" && signatureData.image_data) {
+    try {
+      const base64 = signatureData.image_data.split(",")[1]
+      if (base64) {
+        const imageBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+        const pngImage = await pdfDoc.embedPng(imageBytes)
+        const aspectRatio = pngImage.width / pngImage.height
+        const sigWidth = Math.min(200, aspectRatio * 50)
+        const sigHeight = sigWidth / aspectRatio
+
+        lastPage.drawImage(pngImage, {
+          x: MARGIN_LEFT,
+          y: clientSigY,
+          width: sigWidth,
+          height: sigHeight,
+        })
+      }
+    } catch {
+      // If image embedding fails, fall back to drawing the name
+      lastPage.drawText(signerName, {
+        x: MARGIN_LEFT,
+        y: clientSigY + 5,
+        size: 16,
+        font: helveticaOblique,
+        color: rgb(0.1, 0.1, 0.3),
+      })
+    }
+  } else if (signatureData.type === "typed" && signatureData.typed_name) {
+    // Typed signature — use oblique font to simulate cursive
+    lastPage.drawText(signatureData.typed_name, {
+      x: MARGIN_LEFT,
+      y: clientSigY + 5,
+      size: 18,
+      font: helveticaOblique,
+      color: rgb(0.1, 0.1, 0.3),
+    })
+  }
+
+  // Draw the date next to the date signature line
+  const formattedDate = new Date(signedAt).toLocaleDateString("en-US")
+  lastPage.drawText(formattedDate, {
+    x: MARGIN_LEFT,
+    y: clientDateY + 5,
+    size: 10,
+    font: helvetica,
+    color: rgb(0, 0, 0),
+  })
+
+  // Add a "Digitally Signed" watermark text at the top of the first page
+  const firstPage = pages[0]
+  firstPage.drawText("DIGITALLY SIGNED", {
+    x: 400,
+    y: firstPage.getHeight() - 30,
+    size: 8,
+    font: helvetica,
+    color: rgb(0.3, 0.6, 0.3),
   })
 
   return await pdfDoc.save()

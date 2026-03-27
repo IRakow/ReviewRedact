@@ -41,12 +41,14 @@ function ContractPreview({
   clientId,
   clientName,
   clientEmail,
+  signingToken,
   onClose,
 }: {
   pdfUrl: string
   clientId: string
   clientName: string
   clientEmail: string | null
+  signingToken: string | null
   onClose: () => void
 }) {
   const [emailing, setEmailing] = useState(false)
@@ -96,6 +98,7 @@ function ContractPreview({
           client_id: clientId,
           pdf_base64: base64,
           filename: `DRMC-${clientName.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`,
+          signing_token: signingToken,
         }),
       })
 
@@ -173,6 +176,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
   const [generating, setGenerating] = useState(false)
   const [contractRate, setContractRate] = useState(1500)
   const [contractPdfUrl, setContractPdfUrl] = useState<string | null>(null)
+  const [contractSigningToken, setContractSigningToken] = useState<string | null>(null)
 
   const reviewRows = reviews.map(toReviewRow)
 
@@ -249,11 +253,13 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
         throw new Error(body)
       }
 
+      const sigToken = response.headers.get("X-Signing-Token") || null
       const blob = await response.blob()
       // Revoke old URL if exists
       if (contractPdfUrl) URL.revokeObjectURL(contractPdfUrl)
       const url = URL.createObjectURL(blob)
       setContractPdfUrl(url)
+      setContractSigningToken(sigToken)
     } catch (err) {
       console.error("Contract generation failed:", err)
       alert(`Contract generation failed: ${err instanceof Error ? err.message : "Unknown error"}`)
@@ -265,6 +271,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
   function handleCloseContract() {
     if (contractPdfUrl) URL.revokeObjectURL(contractPdfUrl)
     setContractPdfUrl(null)
+    setContractSigningToken(null)
   }
 
   if (reviews.length === 0) {
@@ -306,6 +313,7 @@ export function ReviewManager({ client, reviews }: ReviewManagerProps) {
           clientId={client.id}
           clientName={client.business_name}
           clientEmail={client.owner_email}
+          signingToken={contractSigningToken}
           onClose={handleCloseContract}
         />
       )}

@@ -84,12 +84,13 @@ interface DirectSaleData {
 export async function createDirectSale(data: DirectSaleData): Promise<{
   clientId: string
   contractId: string
+  signingToken: string
   reviewCount: number
   error?: string
 }> {
   const session = await getSession()
   if (!session || session.user_type !== "owner") {
-    return { clientId: "", contractId: "", reviewCount: 0, error: "Unauthorized" }
+    return { clientId: "", contractId: "", signingToken: "", reviewCount: 0, error: "Unauthorized" }
   }
 
   const supabase = createServerClient()
@@ -116,6 +117,7 @@ export async function createDirectSale(data: DirectSaleData): Promise<{
     return {
       clientId: "",
       contractId: "",
+      signingToken: "",
       reviewCount: 0,
       error: clientError?.message || "Failed to create client",
     }
@@ -169,13 +171,14 @@ export async function createDirectSale(data: DirectSaleData): Promise<{
       status: "draft",
       generated_at: new Date().toISOString(),
     })
-    .select("id")
+    .select("id, signing_token")
     .single()
 
   if (contractError) {
     return {
       clientId: client.id,
       contractId: "",
+      signingToken: "",
       reviewCount: 0,
       error: contractError.message,
     }
@@ -198,6 +201,7 @@ export async function createDirectSale(data: DirectSaleData): Promise<{
   return {
     clientId: client.id,
     contractId: contract!.id,
+    signingToken: contract!.signing_token ?? "",
     reviewCount: selectedRealIds.length,
   }
 }

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { client_id, pdf_base64, filename } = await request.json()
+    const { client_id, pdf_base64, filename, signing_token } = await request.json()
 
     if (!client_id || !pdf_base64 || !filename) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -66,6 +66,15 @@ export async function POST(request: NextRequest) {
           <p>Please find attached your Digital Reputation Management Contract from Business Threat Solutions, LLC.</p>
           <p>This contract outlines the scope of work for the removal of identified Google Reviews associated with <strong>${client.business_name}</strong>.</p>
           <p>Please review the attached document carefully. If you have any questions, please reply to this email.</p>
+          ${signing_token ? `
+          <p style="margin: 20px 0;">
+            <a href="https://reviewredact.com/sign/contract/${signing_token}"
+               style="display: inline-block; background: #1a1a1a; color: #e0e0e0; padding: 12px 28px; text-decoration: none; border-radius: 4px; font-weight: bold; border: 1px solid #374151;">
+              Sign Your Contract Online
+            </a>
+          </p>
+          <p style="font-size: 12px; color: #666;">Or copy this link: https://reviewredact.com/sign/contract/${signing_token}</p>
+          ` : ""}
           <br/>
           <p>Regards,</p>
           <p><strong>Business Threat Solutions, LLC</strong></p>

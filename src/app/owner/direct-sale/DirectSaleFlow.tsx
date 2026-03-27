@@ -83,6 +83,7 @@ export function DirectSaleFlow() {
   const [saving, setSaving] = useState(false)
   const [clientId, setClientId] = useState<string | null>(null)
   const [contractId, setContractId] = useState<string | null>(null)
+  const [signingToken, setSigningToken] = useState<string | null>(null)
   const [pdfBase64, setPdfBase64] = useState<string | null>(null)
   const [pdfFilename, setPdfFilename] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
@@ -210,6 +211,7 @@ export function DirectSaleFlow() {
 
       setClientId(result.clientId)
       setContractId(result.contractId)
+      setSigningToken(result.signingToken || null)
 
       // 2. Generate PDF
       setGeneratingPdf(true)
@@ -242,6 +244,7 @@ export function DirectSaleFlow() {
           client_id: clientId,
           pdf_base64: pdfBase64,
           filename: pdfFilename,
+          signing_token: signingToken,
         }),
       })
 
@@ -972,6 +975,7 @@ export function DirectSaleFlow() {
                   setNotes("")
                   setClientId(null)
                   setContractId(null)
+                  setSigningToken(null)
                   setPdfBase64(null)
                   setPdfFilename(null)
                   setEmailSent(false)

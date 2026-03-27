@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         status: "draft",
         generated_at: new Date().toISOString(),
       })
-      .select("id")
+      .select("id, signing_token")
       .single()
 
     if (contractError) {
@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Content-Length": pdfBytes.length.toString(),
         "X-Contract-Id": contract.id,
+        "X-Signing-Token": contract.signing_token ?? "",
       },
     })
   } catch (err) {
