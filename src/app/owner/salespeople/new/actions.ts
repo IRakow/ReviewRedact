@@ -2,7 +2,6 @@
 
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { PIN_CODE_LENGTH, OWNER_DIRECT_PLAN_A_BASE, OWNER_DIRECT_PLAN_B_BASE } from "@/lib/constants"
 import type { PricingPlan } from "@/lib/types"
@@ -76,6 +75,31 @@ export async function createDirectSalesperson(formData: FormData) {
     { signer_type: "salesperson", signer_id: data.id, document_type: "w9_1099", status: "pending" },
     { signer_type: "salesperson", signer_id: data.id, document_type: "contractor_agreement", status: "pending" },
   ])
+
+  // Email the new salesperson their credentials
+  try {
+    const { Resend } = await import("resend")
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    await resend.emails.send({
+      from: "Review Redact <notifications@reviewredact.com>",
+      to: email,
+      subject: "Welcome to ReviewRedact — Your Login Credentials",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #1a1a1a;">Welcome to ReviewRedact</h2>
+          <p>Hi ${name},</p>
+          <p>You've been invited to ReviewRedact.</p>
+          <p>Your username: <strong>${name}</strong></p>
+          <p>Your access code: <strong style="font-size:24px;font-family:monospace;letter-spacing:0.3em;">${pinCode}</strong></p>
+          <p>Log in at <a href="https://reviewredact.com">reviewredact.com</a> to complete your onboarding.</p>
+          <br/>
+          <p style="font-size: 11px; color: #999;">This is an automated message from ReviewRedact.</p>
+        </div>
+      `,
+    })
+  } catch (e) {
+    console.error("Failed to send welcome email:", e)
+  }
 
   revalidatePath("/owner/salespeople")
   return { data, pin_code: pinCode }

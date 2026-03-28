@@ -10,6 +10,7 @@ export default function NewSalespersonPage() {
   const router = useRouter()
   const [error, setError] = useState("")
   const [createdPin, setCreatedPin] = useState("")
+  const [createdName, setCreatedName] = useState("")
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -25,6 +26,7 @@ export default function NewSalespersonPage() {
       }
       if (result.pin_code) {
         setCreatedPin(result.pin_code)
+        setCreatedName((formData.get("name") as string) ?? "")
       }
     })
   }
@@ -35,13 +37,21 @@ export default function NewSalespersonPage() {
         <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-6 text-center space-y-4">
           <h2 className="text-lg font-semibold text-emerald-400">Salesperson Created</h2>
           <p className="text-sm text-muted-foreground">
-            Share this PIN code with your new salesperson. They&apos;ll use it to log in.
+            Credentials have been emailed to the new salesperson.
           </p>
-          <div className="rounded-sm border border-steel/30 bg-surface px-6 py-4 font-mono text-3xl tracking-[0.5em] text-foreground">
-            {createdPin}
+          <div className="space-y-1">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+              Access Code
+            </p>
+            <div className="rounded-sm border border-steel/30 bg-surface px-6 py-4 font-mono text-3xl tracking-[0.5em] text-foreground">
+              {createdPin}
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            They must sign the 1099 and Contractor Agreement on first login before accessing the system.
+            Username: <span className="text-foreground font-medium">{createdName}</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            They must complete their profile and sign documents on first login.
           </p>
           <button
             onClick={() => router.push("/dashboard/settings")}
@@ -54,6 +64,9 @@ export default function NewSalespersonPage() {
     )
   }
 
+  const inputClass =
+    "w-full rounded-sm border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
+
   return (
     <div className="mx-auto max-w-lg px-6 py-8 space-y-6">
       <div className="flex items-center gap-3">
@@ -65,73 +78,31 @@ export default function NewSalespersonPage() {
             Add Salesperson
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Register a new salesperson on your team
+            Enter the basics — they will complete onboarding on first login
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Full Name *
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Full Name
           </label>
-          <input
-            name="name"
-            type="text"
-            required
-            className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
-          />
+          <input name="name" type="text" required placeholder="First Last" className={inputClass} />
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Email *
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Email
           </label>
-          <input
-            name="email"
-            type="email"
-            required
-            className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
-          />
+          <input name="email" type="email" required placeholder="email@example.com" className={inputClass} />
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Cell Phone *
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Cell Phone
           </label>
-          <input
-            name="cell"
-            type="tel"
-            required
-            className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Company (optional)
-          </label>
-          <input
-            name="company"
-            type="text"
-            className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Base Rate ($/removal)
-          </label>
-          <input
-            name="base_rate_google"
-            type="number"
-            min={1000}
-            defaultValue={1000}
-            className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
-          />
-          <p className="text-[10px] text-muted-foreground">
-            Minimum $1,000. This is the threshold — your salesperson keeps everything the client pays above this amount.
-          </p>
+          <input name="cell" type="tel" required placeholder="(555) 555-5555" className={inputClass} />
         </div>
 
         {error && (

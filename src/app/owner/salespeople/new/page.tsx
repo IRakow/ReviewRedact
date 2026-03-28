@@ -10,6 +10,7 @@ export default function NewDirectSalespersonPage() {
   const router = useRouter()
   const [error, setError] = useState("")
   const [createdPin, setCreatedPin] = useState("")
+  const [createdName, setCreatedName] = useState("")
   const [plan, setPlan] = useState<"owner_plan_a" | "owner_plan_b">("owner_plan_a")
   const [isPending, startTransition] = useTransition()
 
@@ -27,6 +28,7 @@ export default function NewDirectSalespersonPage() {
       }
       if (result.pin_code) {
         setCreatedPin(result.pin_code)
+        setCreatedName((formData.get("name") as string) ?? "")
       }
     })
   }
@@ -37,16 +39,24 @@ export default function NewDirectSalespersonPage() {
         <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-6 text-center space-y-4">
           <h2 className="text-lg font-semibold text-emerald-400">Direct Salesperson Created</h2>
           <p className="text-sm text-muted-foreground">
-            Share this PIN with the new salesperson.
+            Credentials have been emailed to the new salesperson.
           </p>
-          <div className="rounded-sm border border-steel/30 bg-surface px-6 py-4 font-mono text-3xl tracking-[0.5em] text-foreground">
-            {createdPin}
+          <div className="space-y-1">
+            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+              Access Code
+            </p>
+            <div className="rounded-sm border border-steel/30 bg-surface px-6 py-4 font-mono text-3xl tracking-[0.5em] text-foreground">
+              {createdPin}
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Plan: <span className="text-foreground">{plan === "owner_plan_a" ? "Plan A ($750 flat, $1K max)" : "Plan B ($1K base, keep above)"}</span>
+            Username: <span className="text-foreground font-medium">{createdName}</span>
           </p>
           <p className="text-xs text-muted-foreground">
-            They must sign the 1099 and Contractor Agreement on first login.
+            Plan: <span className="text-foreground">{plan === "owner_plan_a" ? "Plan A" : "Plan B"}</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            They must complete their profile and sign documents on first login.
           </p>
           <button
             onClick={() => router.push("/owner/salespeople")}
@@ -59,6 +69,9 @@ export default function NewDirectSalespersonPage() {
     )
   }
 
+  const inputClass =
+    "w-full rounded-sm border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
+
   return (
     <div className="mx-auto max-w-lg px-6 py-8 space-y-6">
       <div className="flex items-center gap-3">
@@ -70,36 +83,36 @@ export default function NewDirectSalespersonPage() {
             Add Direct Salesperson
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Register a salesperson directly under BTS (no reseller)
+            Enter the basics — they will complete onboarding on first login
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Full Name *
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Full Name
           </label>
-          <input name="name" type="text" required className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30" />
+          <input name="name" type="text" required placeholder="First Last" className={inputClass} />
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Email *
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Email
           </label>
-          <input name="email" type="email" required className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30" />
+          <input name="email" type="email" required placeholder="email@example.com" className={inputClass} />
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Cell Phone *
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Cell Phone
           </label>
-          <input name="cell" type="tel" required className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30" />
+          <input name="cell" type="tel" required placeholder="(555) 555-5555" className={inputClass} />
         </div>
 
         {/* Pricing plan selection */}
         <div className="space-y-2">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
             Pricing Plan
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -114,7 +127,7 @@ export default function NewDirectSalespersonPage() {
             >
               <p className="text-sm font-semibold text-foreground">Plan A</p>
               <p className="text-xs text-muted-foreground mt-1">
-                $750 flat per removal. Max client charge: $1,000. BTS keeps the $250 spread.
+                $750 flat per removal. Max client charge: $1,000.
               </p>
             </button>
             <button
@@ -128,7 +141,7 @@ export default function NewDirectSalespersonPage() {
             >
               <p className="text-sm font-semibold text-foreground">Plan B</p>
               <p className="text-xs text-muted-foreground mt-1">
-                $1,000 base to BTS. Salesperson keeps everything above $1,000. No cap.
+                $1,000 base to BTS. Keep everything above.
               </p>
             </button>
           </div>

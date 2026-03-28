@@ -4,9 +4,9 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { SignaturePad } from "@/components/sign/SignaturePad"
 import { W9Content, ContractorAgreementContent } from "@/components/sign/DocumentContent"
-import { signDocument, refreshSessionAfterSigning } from "./actions"
+import { signDocument, refreshSessionAfterSigning, saveOnboardingProfile } from "./actions"
 import type { DocumentType, UserRole } from "@/lib/types"
-import { Check, FileText, Loader2 } from "lucide-react"
+import { Check, FileText, Loader2, User } from "lucide-react"
 
 interface SigningFlowProps {
   initialStatus: {
@@ -15,6 +15,7 @@ interface SigningFlowProps {
   }
   userName: string
   userType: UserRole
+  profileComplete?: boolean
 }
 
 const DOC_LABELS: Record<DocumentType, { title: string; description: string }> = {
@@ -28,9 +29,10 @@ const DOC_LABELS: Record<DocumentType, { title: string; description: string }> =
   },
 }
 
-export function SigningFlow({ initialStatus, userName, userType }: SigningFlowProps) {
+export function SigningFlow({ initialStatus, userName, userType, profileComplete: initialProfileComplete }: SigningFlowProps) {
   const router = useRouter()
   const [status, setStatus] = useState(initialStatus)
+  const [profileComplete, setProfileComplete] = useState(initialProfileComplete ?? false)
   const [activeDoc, setActiveDoc] = useState<DocumentType | null>(
     initialStatus.w9_1099 === "pending"
       ? "w9_1099"
@@ -42,7 +44,42 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
   const [taxId, setTaxId] = useState("")
   const [isPending, startTransition] = useTransition()
 
+  // Profile form state
+  const [legalName, setLegalName] = useState(userName)
+  const [company, setCompany] = useState("")
+  const [address, setAddress] = useState("")
+  const [profileError, setProfileError] = useState("")
+
   const allSigned = status.w9_1099 === "signed" && status.contractor_agreement === "signed"
+
+  function handleProfileSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setProfileError("")
+
+    if (!legalName.trim()) {
+      setProfileError("Legal name is required")
+      return
+    }
+    if (!address.trim()) {
+      setProfileError("Address is required for 1099 reporting")
+      return
+    }
+
+    startTransition(async () => {
+      const result = await saveOnboardingProfile({
+        legal_name: legalName.trim(),
+        company: company.trim() || null,
+        address: address.trim(),
+      })
+
+      if (result.error) {
+        setProfileError(result.error)
+        return
+      }
+
+      setProfileComplete(true)
+    })
+  }
 
   async function handleSign(data: {
     type: "draw" | "typed"
@@ -89,8 +126,113 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
     })
   }
 
+  const inputClass =
+    "w-full rounded-sm border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-steel/50 focus:outline-none focus:ring-1 focus:ring-steel/30"
+
+  // Step 1: Complete Your Profile (before any document signing)
+  if (!profileComplete) {
+    return (
+      <div className="space-y-6">
+        {/* Step indicator */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-steel/15 text-steel text-xs font-bold">
+            1
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground">Complete Your Profile</p>
+            <p className="text-xs text-muted-foreground">Required before signing documents</p>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-border bg-surface p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <User className="h-4 w-4 text-steel" />
+            <h2 className="text-sm font-semibold text-foreground">Your Information</h2>
+          </div>
+
+          <form onSubmit={handleProfileSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Full Legal Name
+              </label>
+              <input
+                type="text"
+                value={legalName}
+                onChange={(e) => setLegalName(e.target.value)}
+                required
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Confirm your legal name as it should appear on tax documents.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Company Name <span className="text-muted-foreground/60">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Your business name, if applicable"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                Mailing Address <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                required
+                placeholder="Street, City, State, ZIP"
+                className={inputClass}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Required by the IRS for 1099 reporting.
+              </p>
+            </div>
+
+            {profileError && (
+              <p className="text-xs font-medium uppercase tracking-wider text-red-400">{profileError}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isPending}
+              className="w-full rounded-sm border border-steel/30 bg-steel/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-steel transition-all hover:bg-steel/20 hover:border-steel/50 disabled:opacity-30"
+            >
+              {isPending ? "Saving..." : "Continue to Documents"}
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {/* Profile step — completed */}
+      <button
+        type="button"
+        disabled
+        className="w-full text-left rounded-md border border-emerald-500/30 bg-emerald-500/5 p-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-sm border border-emerald-500/50 bg-emerald-500/20 text-emerald-400">
+            <Check className="h-3 w-3" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-emerald-400">Profile Complete</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Your information has been saved</p>
+          </div>
+        </div>
+      </button>
+
       {/* Document checklist */}
       <div className="space-y-3">
         {(["w9_1099", "contractor_agreement"] as DocumentType[]).map((docType) => {

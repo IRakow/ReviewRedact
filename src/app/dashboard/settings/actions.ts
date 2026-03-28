@@ -41,15 +41,9 @@ export async function createSalesperson(formData: FormData) {
   const name = formData.get("name") as string
   const email = formData.get("email") as string
   const cell = formData.get("cell") as string
-  const company = (formData.get("company") as string) || null
-  const baseRate = Number(formData.get("base_rate_google")) || RESELLER_SALESPERSON_MIN_RATE
 
   if (!name || !email || !cell) {
     return { error: "Name, email, and cell are required" }
-  }
-
-  if (baseRate < RESELLER_SALESPERSON_MIN_RATE) {
-    return { error: `Base rate must be at least $${RESELLER_SALESPERSON_MIN_RATE}` }
   }
 
   const pinCode = await generateUniquePinCode()
@@ -62,11 +56,10 @@ export async function createSalesperson(formData: FormData) {
       name,
       email,
       cell,
-      company,
       pin_code: pinCode,
       parent_type: "reseller",
       pricing_plan: "reseller_set",
-      base_rate_google: baseRate,
+      base_rate_google: RESELLER_SALESPERSON_MIN_RATE,
       is_active: true,
     })
     .select()
@@ -79,6 +72,29 @@ export async function createSalesperson(formData: FormData) {
     { signer_type: "salesperson", signer_id: data.id, document_type: "w9_1099", status: "pending" },
     { signer_type: "salesperson", signer_id: data.id, document_type: "contractor_agreement", status: "pending" },
   ])
+
+  // Email the new salesperson their credentials
+  try {
+    await resend.emails.send({
+      from: "Review Redact <notifications@reviewredact.com>",
+      to: email,
+      subject: "Welcome to ReviewRedact — Your Login Credentials",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #1a1a1a;">Welcome to ReviewRedact</h2>
+          <p>Hi ${name},</p>
+          <p>You've been invited to ReviewRedact.</p>
+          <p>Your username: <strong>${name}</strong></p>
+          <p>Your access code: <strong style="font-size:24px;font-family:monospace;letter-spacing:0.3em;">${pinCode}</strong></p>
+          <p>Log in at <a href="https://reviewredact.com">reviewredact.com</a> to complete your onboarding.</p>
+          <br/>
+          <p style="font-size: 11px; color: #999;">This is an automated message from ReviewRedact.</p>
+        </div>
+      `,
+    })
+  } catch (e) {
+    console.error("Failed to send welcome email:", e)
+  }
 
   revalidatePath("/dashboard/settings")
   return { data, pin_code: pinCode }

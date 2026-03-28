@@ -36,13 +36,6 @@ export async function createReseller(formData: FormData) {
   const name = formData.get("name") as string
   const email = formData.get("email") as string
   const cell = formData.get("cell") as string
-  const company = (formData.get("company") as string) || null
-  const address = (formData.get("address") as string) || null
-  const taxId = (formData.get("tax_id") as string) || null
-  const baseRateGoogle = parseFloat(formData.get("base_rate_google") as string) || BTS_BASE_RATE
-  const baseRateFacebook = parseFloat(formData.get("base_rate_facebook") as string) || BTS_BASE_RATE_FACEBOOK
-  const commissionPlanType = (formData.get("commission_plan_type") as string) || "fixed"
-  const commissionPlanConfig = JSON.parse((formData.get("commission_plan_config") as string) || "{}")
 
   if (!name || !email || !cell) {
     return { error: "Name, email, and phone are required" }
@@ -57,16 +50,13 @@ export async function createReseller(formData: FormData) {
       name,
       email,
       cell,
-      company,
-      address,
-      tax_id_1099: taxId,
       pin_code: pinCode,
-      base_rate_google: baseRateGoogle,
-      base_rate_facebook: baseRateFacebook,
+      base_rate_google: BTS_BASE_RATE,
+      base_rate_facebook: BTS_BASE_RATE_FACEBOOK,
       role: "reseller",
       is_active: true,
-      commission_plan_type: commissionPlanType,
-      commission_plan_config: commissionPlanConfig,
+      commission_plan_type: "fixed",
+      commission_plan_config: {},
     })
     .select("id, pin_code")
     .single()
@@ -86,8 +76,19 @@ export async function createReseller(formData: FormData) {
     await resend.emails.send({
       from: "Review Redact <notifications@reviewredact.com>",
       to: email,
-      subject: "Welcome to ReviewRedact — Your Access Credentials",
-      html: `<p>Hi ${name},</p><p>You've been invited to ReviewRedact as a reseller.</p><p>Log in at <a href="https://reviewredact.com">reviewredact.com</a></p><p>Your name: <strong>${name}</strong></p><p>Your access code: <strong style="font-size:24px;font-family:monospace;letter-spacing:0.3em;">${pinCode}</strong></p><p>You'll need to sign two documents (W-9 and Contractor Agreement) before accessing the dashboard.</p>`,
+      subject: "Welcome to ReviewRedact — Your Login Credentials",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #1a1a1a;">Welcome to ReviewRedact</h2>
+          <p>Hi ${name},</p>
+          <p>You've been invited to ReviewRedact.</p>
+          <p>Your username: <strong>${name}</strong></p>
+          <p>Your access code: <strong style="font-size:24px;font-family:monospace;letter-spacing:0.3em;">${pinCode}</strong></p>
+          <p>Log in at <a href="https://reviewredact.com">reviewredact.com</a> to complete your onboarding.</p>
+          <br/>
+          <p style="font-size: 11px; color: #999;">This is an automated message from ReviewRedact.</p>
+        </div>
+      `,
     })
   } catch (e) {
     // Email failure shouldn't block creation

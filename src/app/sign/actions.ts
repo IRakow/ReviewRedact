@@ -174,6 +174,35 @@ export async function signDocument(
   }
 }
 
+export async function saveOnboardingProfile(profile: {
+  legal_name: string
+  company: string | null
+  address: string
+}) {
+  const session = await getSession()
+  if (!session) return { error: "Not authenticated — please log in again" }
+
+  if (session.user_type === "owner") {
+    return { error: "Owners do not need to complete onboarding" }
+  }
+
+  const supabase = createServerClient()
+  const table = session.user_type === "reseller" ? "resellers" : "salespeople"
+
+  const { error } = await supabase
+    .from(table)
+    .update({
+      name: profile.legal_name,
+      company: profile.company,
+      address: profile.address,
+    })
+    .eq("id", session.user_id)
+
+  if (error) return { error: error.message }
+
+  return { success: true }
+}
+
 export async function refreshSessionAfterSigning() {
   const session = await getSession()
   if (!session) return { error: "Not authenticated" }
