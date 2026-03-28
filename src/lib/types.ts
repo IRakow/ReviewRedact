@@ -248,6 +248,20 @@ export interface Notification {
   created_at: string
 }
 
+// ─── Client Notes ───────────────────────────────────────────────────────────
+
+export interface ClientNote {
+  id: string
+  client_id: string
+  author_type: "owner" | "reseller" | "salesperson"
+  author_id: string
+  author_name: string
+  content: string
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
 // ─── Prospects ──────────────────────────────────────────────────────────────
 
 export interface Prospect {

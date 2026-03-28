@@ -7,7 +7,8 @@ import { StarRating } from "@/components/dashboard/StarRating"
 import { StarDistribution } from "@/components/dashboard/StarDistribution"
 import { StatsCard } from "@/components/dashboard/StatsCard"
 import { ReviewManager } from "./ReviewManager"
-import type { Client, Review, Snapshot } from "@/lib/types"
+import type { Client, Review, Snapshot, ClientNote } from "@/lib/types"
+import { ClientNotes } from "@/components/dashboard/ClientNotes"
 import {
   ArrowLeft,
   ExternalLink,
@@ -82,6 +83,47 @@ export default async function ClientDetailPage({ params }: PageProps) {
     stars,
     count: activeReviews.filter((r) => r.star_rating === stars).length,
   }))
+
+  // Fetch notes with visibility filtering
+  const { data: allNotesData } = await supabase
+    .from("client_notes")
+    .select("*")
+    .eq("client_id", id)
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+
+  const allNotes: ClientNote[] = (allNotesData ?? []) as ClientNote[]
+
+  // Visibility rules:
+  // - Owner sees all (handled in owner page)
+  // - Reseller sees: own notes + their salespeople's notes + owner notes
+  // - Salesperson sees: own notes + their reseller's notes + owner notes
+  let visibleNotes: ClientNote[]
+  if (session.user_type === "reseller") {
+    // Get salespeople IDs under this reseller
+    const { data: spRows } = await supabase
+      .from("salespeople")
+      .select("id")
+      .eq("reseller_id", session.user_id)
+    const spIds = new Set((spRows ?? []).map((sp: { id: string }) => sp.id))
+
+    visibleNotes = allNotes.filter(
+      (n) =>
+        n.author_type === "owner" ||
+        n.author_id === session.user_id ||
+        spIds.has(n.author_id)
+    )
+  } else if (session.user_type === "salesperson") {
+    visibleNotes = allNotes.filter(
+      (n) =>
+        n.author_type === "owner" ||
+        n.author_id === session.user_id ||
+        (n.author_type === "reseller" && session.parent_reseller_id && n.author_id === session.parent_reseller_id)
+    )
+  } else {
+    // owner fallback (shouldn't hit this page normally)
+    visibleNotes = allNotes
+  }
 
   const typedClient = client as Client
 
@@ -174,6 +216,15 @@ export default async function ClientDetailPage({ params }: PageProps) {
 
       {/* Review manager (interactive) */}
       <ReviewManager client={typedClient} reviews={allReviews} />
+
+      {/* Notes */}
+      <ClientNotes
+        clientId={id}
+        notes={visibleNotes}
+        currentUserId={session.user_id}
+        currentUserType={session.user_type as "owner" | "reseller" | "salesperson"}
+        currentUserName={session.name}
+      />
     </div>
   )
 }

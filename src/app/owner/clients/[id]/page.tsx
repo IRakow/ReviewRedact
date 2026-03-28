@@ -6,7 +6,8 @@ import { StatusBadge } from "@/components/dashboard/StatusBadge"
 import { StarDistribution } from "@/components/dashboard/StarDistribution"
 import { StatsCard } from "@/components/dashboard/StatsCard"
 import { ReviewManager } from "@/app/dashboard/clients/[id]/ReviewManager"
-import type { Client, Review, Snapshot } from "@/lib/types"
+import type { Client, Review, Snapshot, ClientNote } from "@/lib/types"
+import { ClientNotes } from "@/components/dashboard/ClientNotes"
 import {
   ArrowLeft,
   ExternalLink,
@@ -102,6 +103,16 @@ export default async function OwnerClientDetailPage({ params }: PageProps) {
     .order("generated_at", { ascending: false })
 
   const contractList = contracts ?? []
+
+  // Fetch notes — owner sees all
+  const { data: notesData } = await supabase
+    .from("client_notes")
+    .select("*")
+    .eq("client_id", id)
+    .order("is_pinned", { ascending: false })
+    .order("created_at", { ascending: false })
+
+  const clientNotes: ClientNote[] = (notesData ?? []) as ClientNote[]
 
   const typedClient = client as Client
 
@@ -279,6 +290,15 @@ export default async function OwnerClientDetailPage({ params }: PageProps) {
 
       {/* Review manager (interactive) */}
       <ReviewManager client={typedClient} reviews={allReviews} />
+
+      {/* Notes */}
+      <ClientNotes
+        clientId={id}
+        notes={clientNotes}
+        currentUserId={session.user_id}
+        currentUserType="owner"
+        currentUserName={session.name}
+      />
     </div>
   )
 }
