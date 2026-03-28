@@ -93,6 +93,13 @@ export default function NewSalespersonPage() {
 
         <div className="space-y-1.5">
           <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            Business Name <span className="text-muted-foreground/60">(if applicable)</span>
+          </label>
+          <input name="company" type="text" placeholder="Their company name" className={inputClass} />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium uppercase tracking-widest text-muted-foreground">
             Email
           </label>
           <input name="email" type="email" required placeholder="email@example.com" className={inputClass} />

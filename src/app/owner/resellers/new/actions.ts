@@ -36,6 +36,7 @@ export async function createReseller(formData: FormData) {
   const name = formData.get("name") as string
   const email = formData.get("email") as string
   const cell = formData.get("cell") as string
+  const company = (formData.get("company") as string)?.trim() || null
 
   if (!name || !email || !cell) {
     return { error: "Name, email, and phone are required" }
@@ -50,6 +51,7 @@ export async function createReseller(formData: FormData) {
       name,
       email,
       cell,
+      company,
       pin_code: pinCode,
       base_rate_google: BTS_BASE_RATE,
       base_rate_facebook: BTS_BASE_RATE_FACEBOOK,
