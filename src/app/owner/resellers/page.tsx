@@ -48,7 +48,7 @@ export default async function OwnerResellersPage() {
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Resellers</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage all resellers</p>
         </div>
-        <Link href="/admin/resellers/new">
+        <Link href="/owner/resellers/new">
           <Button size="sm">
             <Plus className="h-4 w-4 mr-1" />
             Add Reseller
