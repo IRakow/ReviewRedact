@@ -39,7 +39,7 @@ const navItems = [
     roles: ["reseller"] as UserRole[],
   },
   {
-    label: "Invoices",
+    label: "Financials",
     href: "/dashboard/invoices",
     icon: FileText,
     roles: ["reseller", "salesperson"] as UserRole[],
