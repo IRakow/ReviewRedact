@@ -39,6 +39,7 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
         : null
   )
   const [error, setError] = useState("")
+  const [taxId, setTaxId] = useState("")
   const [isPending, startTransition] = useTransition()
 
   const allSigned = status.w9_1099 === "signed" && status.contractor_agreement === "signed"
@@ -54,7 +55,7 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
 
     startTransition(async () => {
       try {
-        const result = await signDocument(activeDoc, data, navigator.userAgent)
+        const result = await signDocument(activeDoc, data, navigator.userAgent, activeDoc === "w9_1099" ? taxId : undefined)
 
         if (result.error) {
           setError(result.error)
@@ -159,6 +160,26 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
             {activeDoc === "w9_1099" ? <W9Content /> : <ContractorAgreementContent />}
           </div>
 
+          {/* Tax ID field — required for W-9 only */}
+          {activeDoc === "w9_1099" && (
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Taxpayer Identification Number (SSN or EIN) <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={taxId}
+                onChange={(e) => setTaxId(e.target.value)}
+                placeholder="XX-XXXXXXX or XXX-XX-XXXX"
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-[#c9a96e]/50 focus:outline-none focus:ring-1 focus:ring-[#c9a96e]/30 transition-colors"
+                required
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Required by the IRS for 1099 reporting. This will be kept confidential.
+              </p>
+            </div>
+          )}
+
           {/* Error message */}
           {error && (
             <p className="text-xs font-medium uppercase tracking-wider text-red-400">
@@ -167,7 +188,7 @@ export function SigningFlow({ initialStatus, userName, userType }: SigningFlowPr
           )}
 
           {/* Signature pad */}
-          <SignaturePad onSign={handleSign} disabled={isPending} />
+          <SignaturePad onSign={handleSign} disabled={isPending || (activeDoc === "w9_1099" && !taxId.trim())} />
         </div>
       )}
 

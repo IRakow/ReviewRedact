@@ -43,7 +43,7 @@ export const SCRAPE_TIMES_PER_DAY = 3 // 3x daily for in_progress reviews
 // ─── Session ─────────────────────────────────────────────────────────────────
 
 export const SESSION_COOKIE_NAME = "rr_session"
-export const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days in seconds
+export const SESSION_MAX_AGE = 60 * 60 * 24 // 24 hours in seconds
 
 export const PIN_CODE_LENGTH = 6
 

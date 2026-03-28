@@ -46,7 +46,8 @@ export async function signDocument(
     typed_name?: string
     font?: string
   },
-  userAgent?: string
+  userAgent?: string,
+  taxId?: string
 ) {
   const session = await getSession()
   if (!session) return { error: "Not authenticated — please log in again" }
@@ -66,6 +67,11 @@ export async function signDocument(
   }
   if (signaturePayload.type === "typed" && !signaturePayload.typed_name?.trim()) {
     return { error: "No name entered — please type your full name" }
+  }
+
+  // Tax ID is mandatory for W-9
+  if (documentType === "w9_1099" && !taxId?.trim()) {
+    return { error: "Tax ID is required for the W-9 form" }
   }
 
   const signerType = session.user_type === "reseller" ? "reseller" : "salesperson"
@@ -126,6 +132,15 @@ export async function signDocument(
       })
 
       if (error) return { error: error.message }
+    }
+
+    // Save tax ID to signer's record when signing W-9
+    if (documentType === "w9_1099" && taxId?.trim()) {
+      const table = signerType === "reseller" ? "resellers" : "salespeople"
+      await supabase
+        .from(table)
+        .update({ tax_id_1099: taxId.trim() })
+        .eq("id", session.user_id)
     }
 
     // Email all owners about the signed document

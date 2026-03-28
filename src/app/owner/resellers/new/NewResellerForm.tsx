@@ -144,14 +144,6 @@ export default function NewResellerForm() {
           <input name="address" type="text" className={inputClass} />
         </div>
 
-        {/* Tax ID */}
-        <div className="space-y-1.5">
-          <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Tax ID / 1099
-          </label>
-          <input name="tax_id" type="text" className={inputClass} />
-        </div>
-
         {/* Base Rates */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
