@@ -16,6 +16,7 @@ import {
   Sliders,
   History,
   Zap,
+  Calculator,
 } from "lucide-react"
 
 const navItems = [
@@ -26,6 +27,7 @@ const navItems = [
   { label: "Clients", href: "/owner/clients", icon: Building2 },
   { label: "Invoices", href: "/owner/invoices", icon: FileText },
   { label: "Payments", href: "/owner/payments", icon: CreditCard },
+  { label: "Accounting", href: "/owner/accounting", icon: Calculator },
   { label: "Documents", href: "/owner/documents", icon: FolderOpen },
   { label: "Reports", href: "/owner/reports", icon: BarChart3 },
   { label: "Rate Overrides", href: "/owner/overrides", icon: Sliders },

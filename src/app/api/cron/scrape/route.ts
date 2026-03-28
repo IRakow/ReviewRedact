@@ -175,6 +175,29 @@ export async function GET() {
 
         if (!invoice) continue
 
+        // Create removal cost tracking (filing fee)
+        try {
+          const { data: feeSetting } = await supabase
+            .from("system_settings")
+            .select("value")
+            .eq("key", "filing_fee_per_removal")
+            .single()
+          const filingFeeRate =
+            feeSetting?.value &&
+            typeof feeSetting.value === "object" &&
+            "amount" in feeSetting.value
+              ? Number(feeSetting.value.amount)
+              : 275
+          await supabase.from("removal_costs").insert({
+            review_id: review.id,
+            invoice_id: invoice.id,
+            cost_per_removal: filingFeeRate,
+            status: "pending",
+          })
+        } catch {
+          console.error(`Failed to create removal cost for review ${review.id}`)
+        }
+
         // Update review status to waiting_for_payment
         await supabase
           .from("reviews")

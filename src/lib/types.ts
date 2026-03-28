@@ -269,6 +269,28 @@ export interface Prospect {
   updated_at: string
 }
 
+// ─── Removal Costs ──────────────────────────────────────────────────────────
+
+export interface RemovalCost {
+  id: string
+  review_id: string
+  invoice_id: string | null
+  provider_name: string
+  cost_per_removal: number
+  status: "pending" | "paid" | "disputed"
+  paid_at: string | null
+  payment_reference: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface SystemSetting {
+  key: string
+  value: Record<string, unknown>
+  updated_by: string | null
+  updated_at: string
+}
+
 // ─── Commission Splits ──────────────────────────────────────────────────────
 
 export interface CommissionSplit {
