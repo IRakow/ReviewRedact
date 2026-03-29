@@ -28,6 +28,21 @@ export default async function OwnerResellersPage() {
     countMap[c.reseller_id] = (countMap[c.reseller_id] ?? 0) + 1
   }
 
+  // Get document signing status per reseller
+  const { data: docStatus } = await supabase
+    .from("documents")
+    .select("signer_id, document_type, status")
+    .eq("signer_type", "reseller")
+
+  const docMap: Record<string, { w9: boolean; ca: boolean }> = {}
+  for (const d of docStatus ?? []) {
+    if (!docMap[d.signer_id]) docMap[d.signer_id] = { w9: false, ca: false }
+    if (d.status === "signed") {
+      if (d.document_type === "w9_1099") docMap[d.signer_id].w9 = true
+      if (d.document_type === "contractor_agreement") docMap[d.signer_id].ca = true
+    }
+  }
+
   // Get salesperson counts per reseller
   const { data: spCounts } = await supabase
     .from("salespeople")
@@ -70,6 +85,7 @@ export default async function OwnerResellersPage() {
                 <th className="px-5 py-3 text-left">Base Rate</th>
                 <th className="px-5 py-3 text-left">Clients</th>
                 <th className="px-5 py-3 text-left">Salespeople</th>
+                <th className="px-5 py-3 text-left">Docs</th>
                 <th className="px-5 py-3 text-left">Status</th>
                 <th className="px-5 py-3 text-left"></th>
               </tr>
@@ -82,6 +98,14 @@ export default async function OwnerResellersPage() {
                   <td className="px-5 py-3 font-mono text-foreground">${r.base_rate_google}</td>
                   <td className="px-5 py-3 text-muted-foreground">{countMap[r.id] ?? 0}</td>
                   <td className="px-5 py-3 text-muted-foreground">{spCountMap[r.id] ?? 0}</td>
+                  <td className="px-5 py-3">
+                    {(() => {
+                      const docs = docMap[r.id]
+                      if (!docs) return <span className="text-[10px] font-medium uppercase tracking-wider text-red-400">Not Started</span>
+                      if (docs.w9 && docs.ca) return <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-400">Complete</span>
+                      return <span className="text-[10px] font-medium uppercase tracking-wider text-amber-400">Incomplete</span>
+                    })()}
+                  </td>
                   <td className="px-5 py-3">
                     <StatusBadge status={r.is_active ? "active" : "paused"} />
                   </td>
