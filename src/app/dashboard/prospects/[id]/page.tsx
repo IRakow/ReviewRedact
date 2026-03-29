@@ -79,7 +79,7 @@ export default async function ProspectDetailPage({ params }: PageProps) {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+            <h1 className="heading-accent truncate text-xl font-semibold tracking-tight text-foreground">
               {p.contact_name || p.company_name || "Unnamed Lead"}
             </h1>
             <StatusBadge status={statusType(p.status)} />

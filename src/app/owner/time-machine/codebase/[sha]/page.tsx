@@ -27,7 +27,7 @@ export default async function CommitDetailPage({
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">
             Commit Not Found
           </h1>
         </div>
@@ -46,7 +46,7 @@ export default async function CommitDetailPage({
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground truncate">
             {commit.message.split("\n")[0]}
           </h1>
           <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">

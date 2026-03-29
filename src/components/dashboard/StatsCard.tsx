@@ -57,9 +57,9 @@ export function StatsCard({
           </div>
         )}
       </div>
-      {/* Subtle corner accent line */}
-      <div className="absolute top-0 left-0 h-px w-12 bg-gradient-to-r from-steel/40 to-transparent" />
-      <div className="absolute top-0 left-0 h-12 w-px bg-gradient-to-b from-steel/40 to-transparent" />
+      {/* Corner accent — gold tip */}
+      <div className="absolute top-0 left-0 h-px w-16 bg-gradient-to-r from-gold/50 via-gold/20 to-transparent" />
+      <div className="absolute top-0 left-0 h-16 w-px bg-gradient-to-b from-gold/50 via-gold/20 to-transparent" />
     </div>
   )
 }

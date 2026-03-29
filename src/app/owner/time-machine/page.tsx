@@ -61,7 +61,7 @@ export default async function TimeMachineHubPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">
           Time Machine
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">

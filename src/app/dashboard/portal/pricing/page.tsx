@@ -38,7 +38,7 @@ export default function PricingPage() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">
             Update Display Price
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

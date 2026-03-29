@@ -62,7 +62,7 @@ export default async function ResellerDetailPage({
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">
+            <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground truncate">
               {reseller.name}
             </h1>
             <StatusBadge status={reseller.is_active ? "active" : "paused"} />

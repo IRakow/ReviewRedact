@@ -26,7 +26,7 @@ export default async function SnapshotDetailPage({
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">
             Snapshot Not Found
           </h1>
         </div>
@@ -49,7 +49,7 @@ export default async function SnapshotDetailPage({
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">
             Snapshot Detail
           </h1>
           <p className="mt-1 text-sm text-muted-foreground font-mono">

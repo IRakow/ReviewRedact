@@ -17,7 +17,7 @@ export default async function DashboardLayout({
         isAdmin={session.user_type === "owner"}
         userType={session.user_type}
       />
-      <main className="flex-1 overflow-y-auto">
+      <main className="warm-vignette flex-1 overflow-y-auto">
         {children}
       </main>
     </div>

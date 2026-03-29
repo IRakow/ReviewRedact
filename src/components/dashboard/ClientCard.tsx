@@ -32,13 +32,13 @@ export function ClientCard({
       href={`/dashboard/clients/${id}`}
       className={cn(
         "group relative block rounded-md border border-border bg-surface p-5 transition-all duration-200",
-        "hover:border-steel/30 hover:bg-surface-raised",
+        "hover:border-gold/20 hover:bg-surface-raised hover:shadow-[0_0_20px_rgba(201,169,110,0.06)]",
         className
       )}
     >
-      {/* Corner accent */}
-      <div className="absolute top-0 left-0 h-px w-8 bg-gradient-to-r from-steel/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-      <div className="absolute top-0 left-0 h-8 w-px bg-gradient-to-b from-steel/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+      {/* Corner accent — gold always visible, brighter on hover */}
+      <div className="absolute top-0 left-0 h-px w-10 bg-gradient-to-r from-gold/30 to-transparent transition-opacity group-hover:from-gold/60" />
+      <div className="absolute top-0 left-0 h-10 w-px bg-gradient-to-b from-gold/30 to-transparent transition-opacity group-hover:from-gold/60" />
 
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">

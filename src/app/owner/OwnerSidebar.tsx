@@ -50,12 +50,19 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
       {/* Logo */}
       <div className="flex h-14 items-center border-b border-sidebar-border px-5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-steel/30 bg-steel/10 font-mono text-xs font-bold text-steel">
+          <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-gold/30 bg-gold/5 font-mono text-xs font-bold text-gold">
             RR
           </div>
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground">
             Owner Panel
           </span>
+        </div>
+      </div>
+
+      {/* Deco divider */}
+      <div className="mx-4">
+        <div className="deco-divider">
+          <div className="deco-divider-diamond" />
         </div>
       </div>
 
@@ -71,18 +78,15 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "group flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
+                "group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  ? "nav-active-gold bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
               )}
             >
-              {isActive && (
-                <div className="absolute left-0 h-5 w-0.5 rounded-r bg-steel" />
-              )}
               <item.icon className={cn(
                 "h-4 w-4",
-                isActive ? "text-steel" : "text-muted-foreground group-hover:text-steel/60"
+                isActive ? "text-gold" : "text-muted-foreground group-hover:text-gold/50"
               )} />
               {item.label}
             </Link>
@@ -91,7 +95,8 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-3">
+      <div className="relative border-t border-sidebar-border p-3">
+        <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
         <div className="mb-2 px-3">
           <p className="truncate text-xs font-medium text-sidebar-foreground">
             {ownerName}

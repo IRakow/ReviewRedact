@@ -14,7 +14,7 @@ export default async function OwnerLayout({
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <OwnerSidebar ownerName={session.name} />
-      <main className="flex-1 overflow-y-auto">
+      <main className="warm-vignette flex-1 overflow-y-auto">
         {children}
       </main>
     </div>

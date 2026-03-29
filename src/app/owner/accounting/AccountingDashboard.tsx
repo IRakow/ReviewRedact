@@ -251,7 +251,7 @@ export function AccountingDashboard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">
             Financial Command Center
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

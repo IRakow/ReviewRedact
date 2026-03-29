@@ -38,7 +38,7 @@ export default async function OwnerSalespeopleListPage() {
     <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">All Salespeople</h1>
+          <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground">All Salespeople</h1>
           <p className="mt-1 text-sm text-muted-foreground">Reseller teams + owner-direct</p>
         </div>
         <Link href="/owner/salespeople/new">

@@ -78,7 +78,7 @@ export default async function SalespersonDetailPage({
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">
+            <h1 className="heading-accent text-xl font-semibold tracking-tight text-foreground truncate">
               {sp.name}
             </h1>
             <StatusBadge status={sp.is_active ? "active" : "paused"} />
