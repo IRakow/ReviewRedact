@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, UserCheck, Shield, LogOut, Settings, FileText, PhoneCall, UserPlus } from "lucide-react"
+import { Users, UserCheck, Shield, LogOut, Settings, FileText, PhoneCall, UserPlus, User } from "lucide-react"
 import type { UserRole } from "@/lib/types"
 
 interface SidebarProps {
@@ -129,23 +129,43 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
       <div className="border-t border-sidebar-border p-3">
         <div className="mb-2 flex items-center justify-between px-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-sidebar-foreground">
-              {userName}
-            </p>
+            {userType !== "owner" ? (
+              <Link
+                href="/dashboard/profile"
+                className="truncate text-xs font-medium text-sidebar-foreground hover:text-steel transition-colors block"
+                title="Edit profile"
+              >
+                {userName}
+              </Link>
+            ) : (
+              <p className="truncate text-xs font-medium text-sidebar-foreground">
+                {userName}
+              </p>
+            )}
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
               {getRoleLabel(userType)}
             </p>
           </div>
-          {/* Settings wheel — subtle, bottom corner by name */}
-          {settingsHref && (
-            <Link
-              href={settingsHref}
-              className="ml-2 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
-              title="Settings"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </Link>
-          )}
+          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+            {userType !== "owner" && (
+              <Link
+                href="/dashboard/profile"
+                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
+                title="Profile"
+              >
+                <User className="h-3.5 w-3.5" />
+              </Link>
+            )}
+            {settingsHref && (
+              <Link
+                href={settingsHref}
+                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
+                title="Settings"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
         </div>
         <button
           onClick={onLogout}

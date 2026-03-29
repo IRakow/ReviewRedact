@@ -16,7 +16,7 @@ export function VaultRoom() {
   }, [])
 
   return (
-    <div className="relative h-screen w-screen bg-[#080604] overflow-hidden select-none">
+    <div className="relative min-h-screen h-[100dvh] w-screen bg-[#080604] overflow-hidden select-none">
       {/* Speakeasy photo background */}
       <motion.div
         className="absolute inset-0"
@@ -117,7 +117,7 @@ export function VaultRoom() {
           >
             <motion.button
               onClick={handleEnter}
-              className="group relative px-8 py-3 cursor-pointer"
+              className="group relative px-8 py-4 min-h-[44px] cursor-pointer"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

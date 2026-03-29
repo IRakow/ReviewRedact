@@ -91,7 +91,7 @@ export function LoginPanel({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.2, duration: 0.8, ease: "easeOut" }}
-          className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none ${className}`}
+          className={`fixed inset-0 flex items-center justify-center z-50 pointer-events-none px-4 ${className}`}
         >
           <motion.div
             animate={shake ? { x: [-8, 8, -6, 6, -3, 3, 0] } : {}}
@@ -100,7 +100,7 @@ export function LoginPanel({
           >
             <form
               onSubmit={handleSubmit}
-              className="relative w-80 space-y-5 rounded-md border border-[#c9a96e]/20 bg-[#0d0906]/90 p-7 backdrop-blur-xl"
+              className="relative w-full max-w-80 space-y-5 rounded-md border border-[#c9a96e]/20 bg-[#0d0906]/90 p-7 backdrop-blur-xl"
             >
               {/* Corner accents */}
               <div className="absolute top-0 left-0 h-px w-16 bg-gradient-to-r from-[#c9a96e]/40 to-transparent" />
@@ -174,7 +174,7 @@ export function LoginPanel({
               <button
                 type="submit"
                 disabled={loading || name.length === 0 || code.length !== 6}
-                className="w-full rounded-sm border border-[#c9a96e]/30 bg-[#c9a96e]/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-[#c9a96e] transition-all hover:bg-[#c9a96e]/20 hover:border-[#c9a96e]/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-full rounded-sm border border-[#c9a96e]/30 bg-[#c9a96e]/10 px-4 py-3 min-h-[44px] text-xs font-semibold uppercase tracking-widest text-[#c9a96e] transition-all hover:bg-[#c9a96e]/20 hover:border-[#c9a96e]/50 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -206,7 +206,7 @@ export function LoginPanel({
                   animate={{ opacity: 1, height: "auto", marginTop: 12 }}
                   exit={{ opacity: 0, height: 0, marginTop: 0 }}
                   onSubmit={handleResetSubmit}
-                  className="w-80 space-y-3 rounded-md border border-steel/20 bg-[#0a0a0a]/90 p-5 backdrop-blur-xl overflow-hidden"
+                  className="w-full max-w-80 space-y-3 rounded-md border border-steel/20 bg-[#0a0a0a]/90 p-5 backdrop-blur-xl overflow-hidden"
                 >
                   <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground text-center">
                     Request Code Reset
