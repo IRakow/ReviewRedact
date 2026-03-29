@@ -5,6 +5,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { verifyClientAccess } from "@/lib/auth"
 import { revalidatePath } from "next/cache"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 export async function addNote(clientId: string, content: string) {
   const session = await getSession()
@@ -17,15 +18,19 @@ export async function addNote(clientId: string, content: string) {
 
   const supabase = createServerClient()
 
-  const { error } = await supabase.from("client_notes").insert({
+  const newValues = {
     client_id: clientId,
     author_type: session.user_type,
     author_id: session.user_id,
     author_name: session.name,
     content: trimmed,
-  })
+  }
+
+  const { data: inserted, error } = await supabase.from("client_notes").insert(newValues).select("id").single()
 
   if (error) throw new Error(`Failed to add note: ${error.message}`)
+
+  await logAudit({ tableName: "client_notes", recordId: inserted.id, action: "create", oldValues: null, newValues })
 
   revalidatePath(`/owner/clients/${clientId}`)
   revalidatePath(`/dashboard/clients/${clientId}`)
@@ -54,12 +59,16 @@ export async function updateNote(noteId: string, content: string) {
     throw new Error("Only the author can edit this note")
   }
 
+  const old = await getRecordForAudit("client_notes", noteId)
+
   const { error } = await supabase
     .from("client_notes")
     .update({ content: trimmed, updated_at: new Date().toISOString() })
     .eq("id", noteId)
 
   if (error) throw new Error(`Failed to update note: ${error.message}`)
+
+  await logAudit({ tableName: "client_notes", recordId: noteId, action: "update", oldValues: old, newValues: { content: trimmed } })
 
   revalidatePath(`/owner/clients/${note.client_id}`)
   revalidatePath(`/dashboard/clients/${note.client_id}`)
@@ -84,12 +93,16 @@ export async function deleteNote(noteId: string) {
     throw new Error("Unauthorized")
   }
 
+  const old = await getRecordForAudit("client_notes", noteId)
+
   const { error } = await supabase
     .from("client_notes")
     .delete()
     .eq("id", noteId)
 
   if (error) throw new Error(`Failed to delete note: ${error.message}`)
+
+  await logAudit({ tableName: "client_notes", recordId: noteId, action: "delete", oldValues: old, newValues: null })
 
   revalidatePath(`/owner/clients/${note.client_id}`)
   revalidatePath(`/dashboard/clients/${note.client_id}`)

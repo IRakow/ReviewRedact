@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { Resend } from "resend"
 import { PIN_CODE_LENGTH } from "@/lib/constants"
 import type { CommissionPlanType } from "@/lib/types"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -50,6 +51,7 @@ export async function resetResellerPin(id: string) {
     return { error: "Reseller not found" }
   }
 
+  const old = await getRecordForAudit("resellers", id)
   const newPin = await generateUniquePinCode()
 
   const { error } = await supabase
@@ -60,6 +62,8 @@ export async function resetResellerPin(id: string) {
   if (error) {
     return { error: error.message }
   }
+
+  await logAudit({ tableName: "resellers", recordId: id, action: "update", oldValues: old, newValues: { pin_code: "[reset]" } })
 
   // Email the reseller
   try {
@@ -97,6 +101,8 @@ export async function updateReseller(id: string, formData: FormData) {
     return { error: "Reseller not found" }
   }
 
+  const old = await getRecordForAudit("resellers", id)
+
   const baseRateGoogle = Number(formData.get("base_rate_google"))
   const baseRateFacebook = Number(formData.get("base_rate_facebook"))
   const isActive = formData.get("is_active") === "true"
@@ -130,20 +136,24 @@ export async function updateReseller(id: string, formData: FormData) {
     config.sp_flat_fee = Number(spFlatFee)
   }
 
+  const newValues = {
+    base_rate_google: baseRateGoogle,
+    base_rate_facebook: baseRateFacebook,
+    is_active: isActive,
+    commission_plan_type: commissionPlanType,
+    commission_plan_config: config,
+  }
+
   const { error } = await supabase
     .from("resellers")
-    .update({
-      base_rate_google: baseRateGoogle,
-      base_rate_facebook: baseRateFacebook,
-      is_active: isActive,
-      commission_plan_type: commissionPlanType,
-      commission_plan_config: config,
-    })
+    .update(newValues)
     .eq("id", id)
 
   if (error) {
     return { error: error.message }
   }
+
+  await logAudit({ tableName: "resellers", recordId: id, action: "update", oldValues: old, newValues })
 
   revalidatePath(`/owner/resellers/${id}`)
   revalidatePath("/owner/resellers")

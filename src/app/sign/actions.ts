@@ -7,6 +7,7 @@ import { headers } from "next/headers"
 import { Resend } from "resend"
 import { OWNER_EMAILS } from "@/lib/constants"
 import type { DocumentType, SignatureData, Session } from "@/lib/types"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -110,6 +111,7 @@ export async function signDocument(
 
     if (existing) {
       // Update existing pending document
+      const oldDoc = await getRecordForAudit("documents", existing.id)
       const { error } = await supabase
         .from("documents")
         .update({
@@ -120,18 +122,22 @@ export async function signDocument(
         .eq("id", existing.id)
 
       if (error) return { error: error.message }
+
+      await logAudit({ tableName: "documents", recordId: existing.id, action: "update", oldValues: oldDoc, newValues: { status: "signed", document_type: documentType, signer_type: signerType } })
     } else {
       // Insert new signed document
-      const { error } = await supabase.from("documents").insert({
+      const { data: newDoc, error } = await supabase.from("documents").insert({
         signer_type: signerType,
         signer_id: session.user_id,
         document_type: documentType,
         status: "signed",
         signature_data: signatureData,
         signed_at: new Date().toISOString(),
-      })
+      }).select("id").single()
 
       if (error) return { error: error.message }
+
+      await logAudit({ tableName: "documents", recordId: newDoc.id, action: "create", oldValues: null, newValues: { signer_type: signerType, document_type: documentType, status: "signed" } })
     }
 
     // Save tax ID to signer's record when signing W-9
@@ -189,16 +195,22 @@ export async function saveOnboardingProfile(profile: {
   const supabase = createServerClient()
   const table = session.user_type === "reseller" ? "resellers" : "salespeople"
 
+  const old = await getRecordForAudit(table, session.user_id)
+
+  const newValues = {
+    name: profile.legal_name,
+    company: profile.company,
+    address: profile.address,
+  }
+
   const { error } = await supabase
     .from(table)
-    .update({
-      name: profile.legal_name,
-      company: profile.company,
-      address: profile.address,
-    })
+    .update(newValues)
     .eq("id", session.user_id)
 
   if (error) return { error: error.message }
+
+  await logAudit({ tableName: table, recordId: session.user_id, action: "update", oldValues: old, newValues })
 
   return { success: true }
 }

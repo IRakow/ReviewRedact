@@ -3,6 +3,7 @@
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 export async function createOverride(formData: FormData) {
   const session = await getSession()
@@ -30,7 +31,7 @@ export async function createOverride(formData: FormData) {
 
   const supabase = createServerClient()
 
-  const { error } = await supabase.from("rate_overrides").insert({
+  const newValues = {
     set_by_type: "owner",
     set_by_id: session.user_id,
     target_type: targetType,
@@ -38,9 +39,13 @@ export async function createOverride(formData: FormData) {
     client_id: clientId,
     rate_google: rateGoogle,
     notes,
-  })
+  }
+
+  const { data: inserted, error } = await supabase.from("rate_overrides").insert(newValues).select("id").single()
 
   if (error) return { error: error.message }
+
+  await logAudit({ tableName: "rate_overrides", recordId: inserted.id, action: "create", oldValues: null, newValues })
 
   revalidatePath("/owner/overrides")
   return { success: true }
@@ -59,14 +64,18 @@ export async function updateOverride(id: string, formData: FormData) {
     return { error: "Rate must be a positive number" }
   }
 
+  const old = await getRecordForAudit("rate_overrides", id)
   const supabase = createServerClient()
+  const newValues = { rate_google: rateGoogle, notes }
 
   const { error } = await supabase
     .from("rate_overrides")
-    .update({ rate_google: rateGoogle, notes })
+    .update(newValues)
     .eq("id", id)
 
   if (error) return { error: error.message }
+
+  await logAudit({ tableName: "rate_overrides", recordId: id, action: "update", oldValues: old, newValues })
 
   revalidatePath("/owner/overrides")
   return { success: true }
@@ -78,6 +87,7 @@ export async function deleteOverride(id: string) {
     return { error: "Unauthorized" }
   }
 
+  const old = await getRecordForAudit("rate_overrides", id)
   const supabase = createServerClient()
 
   const { error } = await supabase
@@ -86,6 +96,8 @@ export async function deleteOverride(id: string) {
     .eq("id", id)
 
   if (error) return { error: error.message }
+
+  await logAudit({ tableName: "rate_overrides", recordId: id, action: "delete", oldValues: old, newValues: null })
 
   revalidatePath("/owner/overrides")
   return { success: true }

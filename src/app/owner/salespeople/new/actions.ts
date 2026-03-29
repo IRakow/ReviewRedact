@@ -5,6 +5,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { PIN_CODE_LENGTH, OWNER_DIRECT_PLAN_A_BASE, OWNER_DIRECT_PLAN_B_BASE } from "@/lib/constants"
 import type { PricingPlan } from "@/lib/types"
+import { logAudit } from "@/lib/audit"
 
 function generatePinCode(): string {
   const max = Math.pow(10, PIN_CODE_LENGTH)
@@ -69,6 +70,8 @@ export async function createDirectSalesperson(formData: FormData) {
     .single()
 
   if (error) return { error: error.message }
+
+  await logAudit({ tableName: "salespeople", recordId: data.id, action: "create", oldValues: null, newValues: { name, email, cell, parent_type: "owner", pricing_plan: pricingPlan } })
 
   // Create pending document rows
   await supabase.from("documents").insert([

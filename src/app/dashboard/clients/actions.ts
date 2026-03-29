@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { getResellerIdForClient, getSalespersonIdForClient, verifyClientAccess } from "@/lib/auth"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 export async function createClient(formData: FormData) {
   const session = await getSession()
@@ -55,6 +56,8 @@ export async function createClient(formData: FormData) {
     throw new Error(`Failed to create client: ${error.message}`)
   }
 
+  await logAudit({ tableName: "clients", recordId: data.id, action: "create", oldValues: null, newValues: insertData as Record<string, unknown> })
+
   redirect(`/dashboard/clients/${data.id}`)
 }
 
@@ -65,6 +68,7 @@ export async function updateClient(id: string, formData: FormData) {
   // Verify access
   await verifyClientAccess(session, id)
 
+  const old = await getRecordForAudit("clients", id)
   const supabase = createServerClient()
 
   const updates: Record<string, string | null> = {}
@@ -94,6 +98,8 @@ export async function updateClient(id: string, formData: FormData) {
   if (error) {
     throw new Error(`Failed to update client: ${error.message}`)
   }
+
+  await logAudit({ tableName: "clients", recordId: id, action: "update", oldValues: old, newValues: updates })
 
   redirect(`/dashboard/clients/${id}`)
 }

@@ -17,6 +17,7 @@ import {
   History,
   Zap,
   Calculator,
+  ScrollText,
 } from "lucide-react"
 
 const navItems = [
@@ -32,6 +33,7 @@ const navItems = [
   { label: "Reports", href: "/owner/reports", icon: BarChart3 },
   { label: "Rate Overrides", href: "/owner/overrides", icon: Sliders },
   { label: "Time Machine", href: "/owner/time-machine", icon: History },
+  { label: "Audit Log", href: "/owner/audit", icon: ScrollText },
 ]
 
 export function OwnerSidebar({ ownerName }: { ownerName: string }) {

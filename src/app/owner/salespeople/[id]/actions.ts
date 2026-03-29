@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { Resend } from "resend"
 import { PIN_CODE_LENGTH } from "@/lib/constants"
 import type { CommissionPlanType, PricingPlan } from "@/lib/types"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -49,6 +50,7 @@ export async function resetSalespersonPin(id: string) {
     return { error: "Salesperson not found" }
   }
 
+  const old = await getRecordForAudit("salespeople", id)
   const newPin = await generateUniquePinCode()
 
   const { error } = await supabase
@@ -59,6 +61,8 @@ export async function resetSalespersonPin(id: string) {
   if (error) {
     return { error: error.message }
   }
+
+  await logAudit({ tableName: "salespeople", recordId: id, action: "update", oldValues: old, newValues: { pin_code: "[reset]" } })
 
   // Email the salesperson
   try {
@@ -94,6 +98,8 @@ export async function updateSalesperson(id: string, formData: FormData) {
   if (!existing) {
     return { error: "Salesperson not found" }
   }
+
+  const old = await getRecordForAudit("salespeople", id)
 
   const baseRateGoogle = Number(formData.get("base_rate_google"))
   const displayPriceGoogle = formData.get("display_price_google")
@@ -146,6 +152,8 @@ export async function updateSalesperson(id: string, formData: FormData) {
   if (error) {
     return { error: error.message }
   }
+
+  await logAudit({ tableName: "salespeople", recordId: id, action: "update", oldValues: old, newValues: updates })
 
   revalidatePath(`/owner/salespeople/${id}`)
   revalidatePath("/owner/salespeople")

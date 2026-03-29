@@ -2,6 +2,7 @@
 
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
+import { logAudit, getRecordForAudit } from "@/lib/audit"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -266,18 +267,24 @@ export async function markFilingFeePaid(
   paymentReference?: string
 ) {
   await requireOwner()
+  const old = await getRecordForAudit("removal_costs", costId)
   const supabase = createServerClient()
+
+  const newValues = {
+    status: "paid",
+    paid_at: new Date().toISOString(),
+    payment_reference: paymentReference ?? null,
+  }
 
   const { error } = await supabase
     .from("removal_costs")
-    .update({
-      status: "paid",
-      paid_at: new Date().toISOString(),
-      payment_reference: paymentReference ?? null,
-    })
+    .update(newValues)
     .eq("id", costId)
 
   if (error) throw new Error(error.message)
+
+  await logAudit({ tableName: "removal_costs", recordId: costId, action: "update", oldValues: old, newValues })
+
   return { success: true }
 }
 
@@ -384,18 +391,24 @@ export async function markPayoutPaid(
   paymentReference?: string
 ) {
   await requireOwner()
+  const old = await getRecordForAudit("payouts", payoutId)
   const supabase = createServerClient()
+
+  const newValues = {
+    status: "paid",
+    paid_at: new Date().toISOString(),
+    notes: paymentReference ? `Ref: ${paymentReference}` : null,
+  }
 
   const { error } = await supabase
     .from("payouts")
-    .update({
-      status: "paid",
-      paid_at: new Date().toISOString(),
-      notes: paymentReference ? `Ref: ${paymentReference}` : null,
-    })
+    .update(newValues)
     .eq("id", payoutId)
 
   if (error) throw new Error(error.message)
+
+  await logAudit({ tableName: "payouts", recordId: payoutId, action: "update", oldValues: old, newValues })
+
   return { success: true }
 }
 
@@ -425,6 +438,13 @@ export async function updateFilingFeeRate(newRate: number) {
     throw new Error("Invalid filing fee rate")
   }
 
+  // Fetch old value for audit
+  const { data: oldSetting } = await supabase
+    .from("system_settings")
+    .select("*")
+    .eq("key", "filing_fee_per_removal")
+    .maybeSingle()
+
   const { error } = await supabase
     .from("system_settings")
     .upsert({
@@ -435,6 +455,15 @@ export async function updateFilingFeeRate(newRate: number) {
     })
 
   if (error) throw new Error(error.message)
+
+  await logAudit({
+    tableName: "system_settings",
+    recordId: "filing_fee_per_removal",
+    action: oldSetting ? "update" : "create",
+    oldValues: oldSetting ? (oldSetting as Record<string, unknown>) : null,
+    newValues: { key: "filing_fee_per_removal", value: { amount: newRate } },
+  })
+
   return { success: true }
 }
 

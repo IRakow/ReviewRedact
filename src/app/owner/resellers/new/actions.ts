@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { PIN_CODE_LENGTH, BTS_BASE_RATE, BTS_BASE_RATE_FACEBOOK } from "@/lib/constants"
+import { logAudit } from "@/lib/audit"
 
 function generatePinCode(): string {
   const max = Math.pow(10, PIN_CODE_LENGTH)
@@ -64,6 +65,8 @@ export async function createReseller(formData: FormData) {
     .single()
 
   if (error) return { error: error.message }
+
+  await logAudit({ tableName: "resellers", recordId: reseller.id, action: "create", oldValues: null, newValues: { name, email, cell, company, role: "reseller" } })
 
   // Create pending documents
   await supabase.from("documents").insert([
