@@ -14,7 +14,7 @@ export default async function OwnerResellersPage() {
 
   const { data: resellers } = await supabase
     .from("resellers")
-    .select("id, name, email, company, base_rate_google, is_active, role, created_at")
+    .select("id, name, email, company, is_active, role, created_at")
     .eq("role", "reseller")
     .order("created_at", { ascending: false })
 
@@ -82,7 +82,6 @@ export default async function OwnerResellersPage() {
               <tr className="border-b border-border text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 <th className="px-5 py-3 text-left">Name</th>
                 <th className="px-5 py-3 text-left">Company</th>
-                <th className="px-5 py-3 text-left">Base Rate</th>
                 <th className="px-5 py-3 text-left">Clients</th>
                 <th className="px-5 py-3 text-left">Salespeople</th>
                 <th className="px-5 py-3 text-left">Docs</th>
@@ -95,7 +94,6 @@ export default async function OwnerResellersPage() {
                 <tr key={r.id} className="hover:bg-surface/80">
                   <td className="px-5 py-3 font-medium text-foreground">{r.name}</td>
                   <td className="px-5 py-3 text-muted-foreground">{r.company ?? "—"}</td>
-                  <td className="px-5 py-3 font-mono text-foreground">${r.base_rate_google}</td>
                   <td className="px-5 py-3 text-muted-foreground">{countMap[r.id] ?? 0}</td>
                   <td className="px-5 py-3 text-muted-foreground">{spCountMap[r.id] ?? 0}</td>
                   <td className="px-5 py-3">
