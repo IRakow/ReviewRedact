@@ -286,40 +286,95 @@ export function SigningFlow({ initialStatus, userName, userType, profileComplete
 
       {/* Active document signing area */}
       {activeDoc && !allSigned && (
-        <div className="rounded-md border border-border bg-surface p-6 space-y-4">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">
-              {DOC_LABELS[activeDoc].title}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              By signing below, I, <span className="text-foreground">{userName}</span>,
-              acknowledge that I have read and agree to the terms of this document.
-            </p>
-          </div>
+        <div className="rounded-md border border-border bg-surface p-6 space-y-5">
+          {activeDoc === "w9_1099" ? (
+            <>
+              {/* W-9: Simple Q&A approach */}
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">W-9 Tax Information</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Answer a few questions — we&apos;ll fill out the W-9 for you.
+                </p>
+              </div>
 
-          {/* Full legal document */}
-          <div className="rounded-sm border border-border bg-background p-4 max-h-64 overflow-y-auto">
-            {activeDoc === "w9_1099" ? <W9Content /> : <ContractorAgreementContent />}
-          </div>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    What is your full legal name? <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="As shown on your income tax return" className={inputClass} required />
+                </div>
 
-          {/* Tax ID field — required for W-9 only */}
-          {activeDoc === "w9_1099" && (
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                Taxpayer Identification Number (SSN or EIN) <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={taxId}
-                onChange={(e) => setTaxId(e.target.value)}
-                placeholder="XX-XXXXXXX or XXX-XX-XXXX"
-                className="w-full rounded-sm border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-border focus:border-[#c9a96e]/50 focus:outline-none focus:ring-1 focus:ring-[#c9a96e]/30 transition-colors"
-                required
-              />
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    Do you have a business name? <span className="text-muted-foreground/50">(optional)</span>
+                  </label>
+                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="If different from your name above" className={inputClass} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    What is your Tax ID number? <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="SSN (XXX-XX-XXXX) or EIN (XX-XXXXXXX)" className={`${inputClass} font-mono tracking-wider`} required />
+                  <p className="text-[10px] text-muted-foreground">Social Security Number or Employer ID. Kept strictly confidential.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-muted-foreground">
+                    What is your mailing address? <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address, City, State, ZIP" className={inputClass} required />
+                </div>
+              </div>
+
+              {/* Auto-generated W-9 preview */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Your completed W-9
+                </p>
+                <div className="rounded-sm border border-border bg-background p-4 max-h-48 overflow-y-auto">
+                  <div className="text-xs text-muted-foreground space-y-2">
+                    <p className="font-semibold text-foreground text-center">Form W-9 — Request for Taxpayer Identification Number</p>
+                    <p className="text-[10px] text-center text-muted-foreground/60">Department of the Treasury — Internal Revenue Service</p>
+                    <div className="border-t border-border pt-2 mt-2 space-y-1">
+                      <p><span className="text-muted-foreground/60">1. Name:</span> <span className="text-foreground">{legalName || "—"}</span></p>
+                      <p><span className="text-muted-foreground/60">2. Business name:</span> <span className="text-foreground">{company || "N/A"}</span></p>
+                      <p><span className="text-muted-foreground/60">3. Federal tax classification:</span> <span className="text-foreground">Individual / Sole proprietor</span></p>
+                      <p><span className="text-muted-foreground/60">5. Address:</span> <span className="text-foreground">{address || "—"}</span></p>
+                      <p><span className="text-muted-foreground/60">7. TIN:</span> <span className="text-foreground font-mono">{taxId ? taxId.replace(/./g, "•").slice(0, -4) + taxId.slice(-4) : "—"}</span></p>
+                    </div>
+                    <div className="border-t border-border pt-2 mt-2">
+                      <p className="text-[10px]">Under penalties of perjury, I certify that the number shown is my correct taxpayer identification number and I am a U.S. citizen or U.S. person.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <p className="text-[10px] text-muted-foreground">
-                Required by the IRS for 1099 reporting. This will be kept confidential.
+                By signing below, I confirm the information above is correct and I agree to the W-9 certification terms.
               </p>
-            </div>
+            </>
+          ) : (
+            <>
+              {/* Contractor Agreement: show full document */}
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">
+                  {DOC_LABELS[activeDoc].title}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Please read the agreement below, then sign at the bottom.
+                </p>
+              </div>
+
+              <div className="rounded-sm border border-border bg-background p-4 max-h-64 overflow-y-auto">
+                <ContractorAgreementContent />
+              </div>
+
+              <p className="text-[10px] text-muted-foreground">
+                By signing below, I, <span className="text-foreground">{userName}</span>, agree to all terms of this agreement.
+              </p>
+            </>
           )}
 
           {/* Error message */}
@@ -330,7 +385,7 @@ export function SigningFlow({ initialStatus, userName, userType, profileComplete
           )}
 
           {/* Signature pad */}
-          <SignaturePad onSign={handleSign} disabled={isPending || (activeDoc === "w9_1099" && !taxId.trim())} />
+          <SignaturePad onSign={handleSign} disabled={isPending || (activeDoc === "w9_1099" && (!taxId.trim() || !address.trim() || !legalName.trim()))} />
         </div>
       )}
 
