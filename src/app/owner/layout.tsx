@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/session"
-import { OwnerSidebar } from "./OwnerSidebar"
+import { OwnerSidebarWrapper } from "./OwnerSidebarWrapper"
 
 export default async function OwnerLayout({
   children,
@@ -12,8 +12,8 @@ export default async function OwnerLayout({
   if (session.user_type !== "owner") redirect("/dashboard")
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <OwnerSidebar ownerName={session.name} />
+    <div className="flex h-screen flex-col overflow-hidden bg-background md:flex-row">
+      <OwnerSidebarWrapper ownerName={session.name} />
       <main className="warm-vignette flex-1 overflow-y-auto">
         {children}
       </main>

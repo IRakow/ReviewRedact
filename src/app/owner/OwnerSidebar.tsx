@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -18,6 +18,7 @@ import {
   Zap,
   Calculator,
   ScrollText,
+  X,
 } from "lucide-react"
 
 const navItems = [
@@ -36,19 +37,26 @@ const navItems = [
   { label: "Audit Log", href: "/owner/audit", icon: ScrollText },
 ]
 
-export function OwnerSidebar({ ownerName }: { ownerName: string }) {
+export function OwnerSidebar({
+  ownerName,
+  mobileOpen,
+  onMobileClose,
+}: {
+  ownerName: string
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}) {
   const pathname = usePathname()
-  const router = useRouter()
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" })
     window.location.href = "/"
   }
 
-  return (
+  const sidebarContent = (
     <aside className="flex h-screen w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
-      <div className="flex h-14 items-center border-b border-sidebar-border px-5">
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-5">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-gold/30 bg-gold/5 font-mono text-xs font-bold text-gold">
             RR
@@ -57,6 +65,14 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
             Owner Panel
           </span>
         </div>
+        {onMobileClose && (
+          <button
+            onClick={onMobileClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Deco divider */}
@@ -77,6 +93,7 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onMobileClose}
               className={cn(
                 "group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
                 isActive
@@ -114,5 +131,27 @@ export function OwnerSidebar({ ownerName }: { ownerName: string }) {
         </button>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop: static sidebar */}
+      <div className="hidden md:block">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile: overlay sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onMobileClose}
+          />
+          <div className="relative z-10 animate-[slideIn_200ms_ease-out]">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   )
 }

@@ -236,6 +236,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
 /* Skeleton shimmer */
 .skeleton-shimmer {
   background: linear-gradient(

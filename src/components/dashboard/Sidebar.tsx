@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Users, UserCheck, Shield, LogOut, Settings, FileText, PhoneCall, UserPlus, User } from "lucide-react"
+import { Users, UserCheck, Shield, LogOut, Settings, FileText, PhoneCall, UserPlus, User, X } from "lucide-react"
 import type { UserRole } from "@/lib/types"
 
 interface SidebarProps {
@@ -11,6 +11,8 @@ interface SidebarProps {
   isAdmin: boolean
   userType: UserRole
   onLogout: () => void
+  mobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
 const navItems = [
@@ -69,14 +71,14 @@ function getSettingsHref(userType: UserRole): string | null {
   return null
 }
 
-export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps) {
+export function Sidebar({ userName, isAdmin, userType, onLogout, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const settingsHref = getSettingsHref(userType)
 
-  return (
+  const sidebarContent = (
     <aside className="flex h-screen w-56 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
-      <div className="flex h-14 items-center border-b border-sidebar-border px-5">
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-5">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-sm border border-gold/30 bg-gold/5 font-mono text-xs font-bold text-gold">
             RR
@@ -85,6 +87,14 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
             ReviewRedact
           </span>
         </div>
+        {onMobileClose && (
+          <button
+            onClick={onMobileClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Deco divider */}
@@ -112,6 +122,7 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onMobileClose}
                 className={cn(
                   "group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
                   isActive
@@ -129,7 +140,7 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
           })}
       </nav>
 
-      {/* Footer — name + subtle settings wheel + logout */}
+      {/* Footer */}
       <div className="relative border-t border-sidebar-border p-3">
         <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
         <div className="mb-2 flex items-center justify-between px-3">
@@ -137,6 +148,7 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
             {userType !== "owner" ? (
               <Link
                 href="/dashboard/profile"
+                onClick={onMobileClose}
                 className="truncate text-xs font-medium text-sidebar-foreground hover:text-steel transition-colors block"
                 title="Edit profile"
               >
@@ -155,6 +167,7 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
             {userType !== "owner" && (
               <Link
                 href="/dashboard/profile"
+                onClick={onMobileClose}
                 className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
                 title="Profile"
               >
@@ -164,6 +177,7 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
             {settingsHref && (
               <Link
                 href={settingsHref}
+                onClick={onMobileClose}
                 className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground"
                 title="Settings"
               >
@@ -181,5 +195,27 @@ export function Sidebar({ userName, isAdmin, userType, onLogout }: SidebarProps)
         </button>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop: static sidebar */}
+      <div className="hidden md:block">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile: overlay sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onMobileClose}
+          />
+          <div className="relative z-10 animate-[slideIn_200ms_ease-out]">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   )
 }

@@ -11,7 +11,7 @@ export default async function DashboardLayout({
   if (!session) redirect("/")
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background md:flex-row">
       <SidebarWrapper
         userName={session.name}
         isAdmin={session.user_type === "owner"}
