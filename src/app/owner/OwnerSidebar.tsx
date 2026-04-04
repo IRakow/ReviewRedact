@@ -18,11 +18,13 @@ import {
   Zap,
   Calculator,
   ScrollText,
+  PenLine,
   X,
 } from "lucide-react"
 
 const navItems = [
   { label: "Dashboard", href: "/owner", icon: LayoutDashboard },
+  { label: "Quick Entry", href: "/owner/quick-entry", icon: PenLine },
   { label: "Direct Sale", href: "/owner/direct-sale", icon: Zap },
   { label: "Resellers", href: "/owner/resellers", icon: Users },
   { label: "Salespeople", href: "/owner/salespeople", icon: UserCheck },
