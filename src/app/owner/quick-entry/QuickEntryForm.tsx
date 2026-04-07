@@ -30,6 +30,7 @@ interface QuickEntry {
   contact_name: string | null
   contact_email: string | null
   contact_phone: string | null
+  link_url: string | null
   amount: number
   notes: string | null
   notify_emails: string[]
@@ -204,6 +205,19 @@ export function QuickEntryForm({ entries }: { entries: QuickEntry[] }) {
               />
             </div>
 
+            {/* Link / GMB URL */}
+            <div className="sm:col-span-2 lg:col-span-2">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Link / GMB URL
+              </label>
+              <input
+                name="link_url"
+                type="url"
+                placeholder="https://maps.google.com/... or any URL"
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30"
+              />
+            </div>
+
             {/* Amount */}
             <div>
               <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
@@ -352,6 +366,13 @@ export function QuickEntryForm({ entries }: { entries: QuickEntry[] }) {
                       </div>
                     )}
                   </div>
+
+                  {entry.link_url && (
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">Link: </span>
+                      <a href={entry.link_url} target="_blank" rel="noopener noreferrer" className="text-steel hover:text-steel-light break-all">{entry.link_url}</a>
+                    </div>
+                  )}
 
                   {entry.notes && (
                     <div className="rounded bg-surface-raised px-3 py-2 text-xs text-foreground whitespace-pre-wrap">

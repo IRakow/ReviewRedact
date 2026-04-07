@@ -19,6 +19,7 @@ export async function createQuickEntry(formData: FormData) {
   const contactName = (formData.get("contact_name") as string)?.trim() || null
   const contactEmail = (formData.get("contact_email") as string)?.trim() || null
   const contactPhone = (formData.get("contact_phone") as string)?.trim() || null
+  const linkUrl = (formData.get("link_url") as string)?.trim() || null
   const amountStr = (formData.get("amount") as string)?.trim()
   const amount = amountStr ? parseFloat(amountStr) : 0
   const notes = (formData.get("notes") as string)?.trim() || null
@@ -34,6 +35,7 @@ export async function createQuickEntry(formData: FormData) {
     contact_name: contactName,
     contact_email: contactEmail,
     contact_phone: contactPhone,
+    link_url: linkUrl,
     amount,
     notes,
     notify_emails: notifyEmails,
