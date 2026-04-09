@@ -39,6 +39,39 @@ export async function createQuickClient(formData: FormData) {
 
   if (error) return { error: `Failed to create client: ${error.message}` }
 
+  // Auto-scrape reviews immediately so the client page has data
+  try {
+    const { scrapeGoogleReviews } = await import("@/lib/scraper")
+    const result = await scrapeGoogleReviews(googleUrl)
+
+    if (result.reviews.length > 0) {
+      const reviewRows = result.reviews.map((r) => ({
+        client_id: data.id,
+        platform: "google" as const,
+        reviewer_name: r.reviewer_name,
+        star_rating: r.star_rating,
+        review_text: r.review_text,
+        review_date: r.review_date,
+        status: "active" as const,
+      }))
+
+      await supabase.from("reviews").insert(reviewRows)
+
+      // Save snapshot
+      const avgRating =
+        result.reviews.reduce((sum, r) => sum + r.star_rating, 0) /
+        result.reviews.length
+
+      await supabase.from("snapshots").insert({
+        client_id: data.id,
+        total_reviews: result.reviews.length,
+        average_rating: Math.round(avgRating * 100) / 100,
+      })
+    }
+  } catch {
+    // Scrape failure shouldn't block client creation — they can re-scrape from the detail page
+  }
+
   revalidatePath("/owner/clients")
   redirect(`/owner/clients/${data.id}`)
 }
