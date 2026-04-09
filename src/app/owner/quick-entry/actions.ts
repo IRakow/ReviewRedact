@@ -3,6 +3,45 @@
 import { getSession } from "@/lib/session"
 import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
+
+export async function createQuickClient(formData: FormData) {
+  const session = await getSession()
+  if (!session || session.user_type !== "owner") {
+    return { error: "Unauthorized" }
+  }
+
+  const businessName = (formData.get("business_name") as string)?.trim()
+  if (!businessName) return { error: "Business name is required" }
+
+  const googleUrl = (formData.get("google_url") as string)?.trim()
+  if (!googleUrl) return { error: "Google Maps URL is required" }
+
+  const ownerName = (formData.get("owner_name") as string)?.trim() || "TBD"
+  const address = (formData.get("address") as string)?.trim() || "TBD"
+  const businessPhone = (formData.get("business_phone") as string)?.trim() || null
+
+  const supabase = createServerClient()
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({
+      reseller_id: session.user_id,
+      business_name: businessName,
+      owner_name: ownerName,
+      address,
+      business_phone: businessPhone,
+      google_url: googleUrl,
+      status: "pending",
+    })
+    .select("id")
+    .single()
+
+  if (error) return { error: `Failed to create client: ${error.message}` }
+
+  revalidatePath("/owner/clients")
+  redirect(`/owner/clients/${data.id}`)
+}
 
 export async function createQuickEntry(formData: FormData) {
   const session = await getSession()

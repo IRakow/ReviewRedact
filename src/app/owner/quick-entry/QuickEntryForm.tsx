@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition, useRef } from "react"
-import { createQuickEntry, updateEntryStatus, deleteEntry } from "./actions"
+import { createQuickEntry, createQuickClient, updateEntryStatus, deleteEntry } from "./actions"
 import { cn } from "@/lib/utils"
 import {
   ChevronDown,
@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Send,
   Plus,
+  Building2,
 } from "lucide-react"
 
 const ENTRY_TYPES = [
@@ -65,9 +66,12 @@ function statusColor(status: string) {
 export function QuickEntryForm({ entries }: { entries: QuickEntry[] }) {
   const [isPending, startTransition] = useTransition()
   const [showForm, setShowForm] = useState(false)
+  const [showQuickClient, setShowQuickClient] = useState(false)
   const [error, setError] = useState("")
+  const [clientError, setClientError] = useState("")
   const [success, setSuccess] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+  const clientFormRef = useRef<HTMLFormElement>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [filter, setFilter] = useState<"all" | "open" | "completed" | "cancelled">("all")
 
@@ -83,6 +87,17 @@ export function QuickEntryForm({ entries }: { entries: QuickEntry[] }) {
         formRef.current?.reset()
         setTimeout(() => { setSuccess(false); setShowForm(false) }, 1500)
       }
+    })
+  }
+
+  function handleQuickClient(formData: FormData) {
+    setClientError("")
+    startTransition(async () => {
+      const result = await createQuickClient(formData)
+      if (result?.error) {
+        setClientError(result.error)
+      }
+      // On success, the action redirects to the client page
     })
   }
 
@@ -122,14 +137,112 @@ export function QuickEntryForm({ entries }: { entries: QuickEntry[] }) {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wider text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Quick Add
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setShowQuickClient(!showQuickClient); setShowForm(false) }}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors",
+              showQuickClient
+                ? "bg-gold/20 text-gold border border-gold/40"
+                : "bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20"
+            )}
+          >
+            <Building2 className="h-3.5 w-3.5" />
+            Quick Client
+          </button>
+          <button
+            onClick={() => { setShowForm(!showForm); setShowQuickClient(false) }}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wider text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Quick Add
+          </button>
+        </div>
       </div>
+
+      {/* Quick Client form — creates a real client and goes to their review page */}
+      {showQuickClient && (
+        <form
+          ref={clientFormRef}
+          action={handleQuickClient}
+          className="rounded-md border border-gold/30 bg-surface p-5 space-y-4"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Building2 className="h-4 w-4 text-gold" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-gold">
+              Quick Client — skips to reviews & calculator
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Business Name *
+              </label>
+              <input
+                name="business_name"
+                required
+                placeholder="Joe's Pizza"
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Contact Name
+              </label>
+              <input
+                name="owner_name"
+                placeholder="Optional"
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Google Maps / GMB URL *
+              </label>
+              <input
+                name="google_url"
+                type="url"
+                required
+                placeholder="https://maps.google.com/..."
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Address
+              </label>
+              <input
+                name="address"
+                placeholder="Optional — fill in later"
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Phone
+              </label>
+              <input
+                name="business_phone"
+                placeholder="Optional"
+                className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/30"
+              />
+            </div>
+          </div>
+
+          {clientError && (
+            <p className="text-xs font-medium uppercase tracking-wider text-red-400">{clientError}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="rounded-md bg-gold/15 border border-gold/30 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider text-gold transition-colors hover:bg-gold/25 disabled:opacity-50"
+          >
+            {isPending ? "Creating Client..." : "Create Client & View Reviews"}
+          </button>
+        </form>
+      )}
 
       {/* Quick add form */}
       {showForm && (
